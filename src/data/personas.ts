@@ -84,16 +84,22 @@ const priyaConfig: GeneratorConfig = {
   seed: 'persona:priya:v3',
   days: 188,
   endDate: END_DATE,
-  meanCycleLength: 33,
-  cycleLengthSd: 6,
+  // Irregular but not so long that the default 92-day window contains fewer than the
+  // two complete cycles the evidence gate requires. Her story is the treatment
+  // comparison, and it can only be told if the window holds enough cycles to reach it.
+  meanCycleLength: 30,
+  cycleLengthSd: 4,
   meanBleedDays: 7,
   missingness: { mode: 'mcar', rate: 0.1 },
+  // Norethisterone starts 2026-07-27. Pain and back pain fall substantially after it;
+  // fatigue does not, which is the more realistic and more interesting story — a
+  // partial response the patient would struggle to articulate from memory.
   symptoms: [
-    { id: 'pelvic_pain', cyclical: false, kappa: 0, mu: 0, baseRate: 0.52, amplitude: 0.1, severityMean: 6, askProbability: 0.98 },
-    { id: 'lower_back_pain', cyclical: false, kappa: 0, mu: 0, baseRate: 0.3, amplitude: 0.08, severityMean: 5, askProbability: 0.9 },
+    { id: 'pelvic_pain', cyclical: false, kappa: 0, mu: 0, baseRate: 0.62, amplitude: 0.1, severityMean: 6, askProbability: 0.98, stepChange: { fromDate: '2026-07-27', multiplier: 0.45 } },
+    { id: 'lower_back_pain', cyclical: false, kappa: 0, mu: 0, baseRate: 0.36, amplitude: 0.08, severityMean: 5, askProbability: 0.9, stepChange: { fromDate: '2026-07-27', multiplier: 0.5 } },
     { id: 'fatigue', cyclical: false, kappa: 0, mu: 0, baseRate: 0.42, amplitude: 0.1, severityMean: 5, askProbability: 0.92 },
     { id: 'menstrual_pain', cyclical: true, kappa: 6, mu: 0.1, baseRate: 0.02, amplitude: 0.6, severityMean: 6, askProbability: 0.95 },
-    { id: 'bladder_pain', cyclical: false, kappa: 0, mu: 0, baseRate: 0.22, amplitude: 0.06, severityMean: 4, askProbability: 0.8 },
+    { id: 'bladder_pain', cyclical: false, kappa: 0, mu: 0, baseRate: 0.26, amplitude: 0.06, severityMean: 4, askProbability: 0.8 },
     { id: 'dysuria', cyclical: false, kappa: 0, mu: 0, baseRate: 0.14, amplitude: 0.05, severityMean: 4, askProbability: 0.7, graded: false },
     { id: 'headache', cyclical: false, kappa: 0, mu: 0, baseRate: 0.16, amplitude: 0.05, severityMean: 4, askProbability: 0.6 },
   ],
@@ -112,16 +118,19 @@ const priyaConfig: GeneratorConfig = {
       id: 'tx-progestin',
       kind: 'progestin',
       label: 'Norethisterone 5 mg',
-      startDate: '2026-06-24',
+      // Placed so the default 92-day window holds a substantial pre-treatment period
+      // as well as the on-treatment period; a before/during comparison needs both.
+      startDate: '2026-07-27',
       dose: '5 mg daily',
       reason: 'Persistent non-cyclical pelvic pain',
+      indicationSymptomId: 'pelvic_pain',
       sideEffects: ['Breakthrough bleeding', 'Low mood'],
       patientPerceivedChange: 'better',
     },
   ],
   clinicalEvents: [
     { id: 'p1', kind: 'laparoscopy', date: '2024-11-12', label: 'Diagnostic laparoscopy', outcome: 'Endometriosis confirmed, ASRM stage II; ablation performed' },
-    { id: 'p2', kind: 'gynaecology', date: '2026-06-24', label: 'Gynaecology review', reason: 'Recurrent pain 18 months post-surgery', outcome: 'Started norethisterone' },
+    { id: 'p2', kind: 'gynaecology', date: '2026-07-27', label: 'Gynaecology review', reason: 'Recurrent pain 18 months post-surgery', outcome: 'Started norethisterone' },
     { id: 'p3', kind: 'emergency', date: '2026-05-09', label: 'Emergency department', reason: 'Acute severe pelvic pain', outcome: 'Analgesia, discharged; no acute cause found' },
     { id: 'p4', kind: 'gynaecology', date: '2026-09-02', label: 'Gynaecology follow-up', reason: 'Treatment review' },
   ],

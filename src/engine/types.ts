@@ -160,6 +160,16 @@ export interface TreatmentEpisode {
   endDate?: string
   dose?: string
   reason?: string
+  /**
+   * The symptom this treatment was actually prescribed for.
+   *
+   * This makes the before/after comparison for that symptom a *pre-specified primary
+   * question*, tested in its own family, while every other symptom is exploratory and
+   * corrected together. Without the distinction, a genuine response in the indication
+   * symptom is penalised by however many unrelated symptoms the patient happens to
+   * track — which is both statistically the wrong family and clinically backwards.
+   */
+  indicationSymptomId?: string
   sideEffects?: string[]
   patientPerceivedChange?: 'better' | 'unchanged' | 'worse' | 'unsure'
 }
@@ -312,6 +322,12 @@ export interface EffectSize {
 export interface Finding {
   id: string
   kind: PatternKind
+  /**
+   * The multiplicity family this test belongs to. Defaults to `kind`. Set explicitly
+   * where one pattern class contains both pre-specified and exploratory hypotheses,
+   * so the two are corrected separately.
+   */
+  familyKey?: string
   symptomId?: string
   secondarySymptomId?: string
   /** Machine-readable numbers the brief renders. Never authored by a language model. */

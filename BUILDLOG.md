@@ -69,6 +69,8 @@ A family here is one pattern class within one patient: all cyclicity tests toget
 
 Correcting all classes as a single family was **measurably wrong**, not merely conservative — see §C1. This is less conservative than global correction, and that is a deliberate, stated trade: the brief presents these classes in separate sections answering separate clinical questions.
 
+One class splits further. For treatment response, the symptom a treatment was *prescribed for* is a pre-specified primary question and is corrected in its own family; every other symptom is exploratory and corrected together. Without the split, a genuine response in the indication symptom is penalised by however many unrelated symptoms the patient happens to track — see §C5 for the case that exposed it. This mirrors the standard trial convention that a pre-specified primary endpoint is not penalised by exploratory secondary endpoints.
+
 ## A3. Parameters, with rationale
 
 | Parameter | Value | Rationale |
@@ -224,10 +226,10 @@ The 59.5% figure is deliberately reported rather than hidden. The remainder are 
 | Stage | Time |
 |---|---|
 | Feature engine | 0.9 ms |
-| Pattern engine | 86.8 ms |
-| Brief generation | 0.1 ms |
+| Pattern engine | 88.4 ms |
+| Brief generation | 0.2 ms |
 | Fidelity check | 4.4 ms |
-| **Total p50 / p95 / max** | **89.7 / 111.0 / 142.7 ms** |
+| **Total p50 / p95 / max** | **92.3 / 110.3 / 114.6 ms** |
 
 **Interpretation.** Dominated almost entirely by the permutation tests for co-occurrence (2000 iterations × candidate pairs). Verification costs about 5% of the total — cheap enough to run on every render, which is why the app verifies continuously rather than at export. If latency ever mattered, the permutation count is the only dial worth touching.
 
@@ -280,7 +282,19 @@ These are logged because the process that caught them is itself evidence about c
 
 **Fix:** descriptive findings are exempt from the significance gate; their counts are true regardless of trend. Claims per brief rose from 197 to 226.
 
-## C5. Smaller fixes
+## C5. Treatment response was being corrected against the wrong family
+
+**Found by:** reading a rendered brief for the treatment persona and noticing the medication section carried no before/during comparison at all.
+
+**Diagnosis:** the engine tests every tracked symptom against the treatment date — seven for this patient. The symptom the drug was actually prescribed for showed a large, real change (pelvic pain on 24 of 37 observed days before, 11 of 40 during; p = 0.0173), but Benjamini–Hochberg corrected it against six unrelated symptoms that were all null, pushing **q to 0.1213**. The finding was suppressed.
+
+The correction was doing exactly what it should; it was applied to the wrong family. Asking "did the symptom we treated improve?" is a pre-specified primary question. Asking "did any of her other six symptoms move?" is exploratory. Pooling them means the more symptoms a patient tracks, the less able the system is to detect that her treatment worked — statistically the wrong family and clinically backwards.
+
+**Fix:** `TreatmentEpisode` gained an `indicationSymptomId`, and `Finding` gained an optional `familyKey` so one pattern class can hold several correction families. The indication symptom is now tested in a family of one (q = p = 0.0173, reported); the six exploratory symptoms remain pooled and correctly suppressed.
+
+**Note on process:** the alternative fix was to enlarge the simulated treatment effect until it cleared the old threshold. That would have been tuning the data to flatter the product, and it would have left the underlying error in place for every real patient tracking more than a handful of symptoms.
+
+## C6. Smaller fixes
 
 - **Wilson interval** returned 0.9999999999999999 at k=n. Endpoints are now pinned exactly rather than letting rounding leak into a reported CI.
 - **An asserted number that never appeared in its own sentence.** A brief-generation invariant test caught `peakCycleDay: 0` being asserted while the prose said "the first day of bleeding". The key is now omitted when the sentence spells it in words — the `assertedValues` contract is that it lists what a reader actually sees.

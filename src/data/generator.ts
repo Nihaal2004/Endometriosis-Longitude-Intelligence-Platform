@@ -55,6 +55,15 @@ export interface SymptomSpec {
   amplitude: number
   /** Change in baseRate per cycle. Positive = worsening. */
   drift?: number
+  /**
+   * A step change in occurrence probability from a given date — the shape a treatment
+   * effect actually takes, as opposed to the gradual drift `drift` models.
+   *
+   * This is a property of the *generative process*, not of the engine: the pattern
+   * engine has no knowledge of treatment dates when computing symptom rates, and
+   * detectTreatmentResponse re-discovers the change from the day records alone.
+   */
+  stepChange?: { fromDate: string; multiplier: number }
   /** Probability the app asks about this symptom on a logged day (adaptive questioning). */
   askProbability?: number
   /** Mean severity when present, before any phase boost. */
@@ -110,12 +119,20 @@ export function occurrenceProbability(
   spec: SymptomSpec,
   theta: number,
   cycleIndex: number,
+  date?: string,
 ): number {
   const drift = (spec.drift ?? 0) * cycleIndex
   const shape = spec.cyclical
     ? vonMisesRelativeDensity(theta, spec.mu, spec.kappa)
     : meanVonMisesDensity(spec.kappa) // matched marginal prevalence, no phase structure
-  return clamp01(spec.baseRate + spec.amplitude * shape + drift)
+
+  const base = clamp01(spec.baseRate + spec.amplitude * shape + drift)
+
+  const step = spec.stepChange
+  if (step && date !== undefined && date >= step.fromDate) {
+    return clamp01(base * step.multiplier)
+  }
+  return base
 }
 
 function clamp01(x: number): number {
@@ -196,7 +213,7 @@ export function generatePatient(config: GeneratorConfig): PatientRecord {
     const severities: Record<string, number> = {}
 
     for (const spec of config.symptoms) {
-      const p = occurrenceProbability(spec, meta.theta, meta.cycleIndex)
+      const p = occurrenceProbability(spec, meta.theta, meta.cycleIndex, dates[i])
       const present = rand.bernoulli(p)
       states[spec.id] = present
       if (present) {

@@ -441,9 +441,16 @@ export function detectTreatmentResponse(
 
   const rate = poissonRateTest(duringPresent, duringObserved, beforePresent, beforeObserved)
 
+  // The symptom the treatment was prescribed for is a pre-specified primary question
+  // and is corrected in its own family; every other symptom is exploratory.
+  const isIndication = treatment.indicationSymptomId === symptomId
+
   return {
     id: `treatment_response:${treatmentId}:${symptomId}`,
     kind: 'treatment_response',
+    familyKey: isIndication
+      ? `treatment_response:primary:${treatmentId}`
+      : `treatment_response:exploratory:${treatmentId}`,
     symptomId,
     values: {
       beforePresent,
@@ -555,11 +562,12 @@ export function runPatternEngine(
   // answering separate clinical questions, and a clinician reading the cyclicity
   // section is not drawing a joint inference across co-occurrence results.
   const tested = all.filter((f) => f.test !== undefined)
-  const families = new Map<PatternKind, Finding[]>()
+  const families = new Map<string, Finding[]>()
   for (const f of tested) {
-    const family = families.get(f.kind) ?? []
+    const key = f.familyKey ?? f.kind
+    const family = families.get(key) ?? []
     family.push(f)
-    families.set(f.kind, family)
+    families.set(key, family)
   }
   for (const family of families.values()) {
     const qValues = benjaminiHochberg(family.map((f) => f.test!.p))

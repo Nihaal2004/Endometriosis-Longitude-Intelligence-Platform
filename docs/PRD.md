@@ -78,6 +78,8 @@ Per symptom, per analysis window: observed days, days present, severe days (≥7
 | Changed from her own baseline? | **Exact conditional Poisson** rate test | A cycle may contribute 3–8 events; normal-approximation two-sample Poisson is unreliable there. *Rejected: comparison against a population average.* |
 | How many are spurious? | **Benjamini–Hochberg**, within pattern family | ~19 tests per patient; uncorrected we would expect a false finding in nearly every brief. FDR suits screening; Bonferroni discards too much power. |
 
+For treatment response the family splits again: the symptom a treatment was prescribed for (`indicationSymptomId`) is a **pre-specified primary** question corrected alone, and every other symptom is exploratory and corrected together — otherwise the more symptoms a patient tracks, the less able the system is to detect that her treatment worked.
+
 ### The evidence gate
 
 A finding is reported only if **coverage ≥ 60%**, **≥2 complete cycles in the window**, **≥4 recorded occurrences**, and **q < 0.05**. A finding that fails is *withheld with its reason shown*, never silently dropped — absence of evidence must not read as evidence of absence.
