@@ -226,8 +226,13 @@ export function generatePatient(config: GeneratorConfig): PatientRecord {
       // MAR, in the adversarial direction: the worse the day, the more likely the
       // patient is too unwell or too preoccupied to log it. This preferentially
       // removes menstrual-window days and therefore *attenuates* the very signal the
-      // cyclicity detector is looking for. Scaled so the marginal missingness rate
-      // still averages to `rate`, making MCAR and MAR runs directly comparable.
+      // cyclicity detector is looking for.
+      //
+      // Note that this does NOT preserve the marginal missingness rate: because most
+      // days carry below-peak burden, the multiplier averages well under 1 and a given
+      // `rate` yields less total missingness under MAR than under MCAR. MCAR and MAR
+      // runs are therefore only comparable at matched *coverage*, not at matched
+      // `rate`, and the evaluation report indexes the comparison by coverage.
       const relative = burdenOf(i) / maxBurden
       missProbability = clamp01(config.missingness.rate * (0.4 + 1.2 * relative))
     }
@@ -346,6 +351,17 @@ export interface CohortConfig {
   seedPrefix: string
   /** Symptoms per patient. */
   symptomsPerPatient?: number
+  /**
+   * Hold expected per-day occurrence probability constant at this value, by solving
+   * for the amplitude that achieves it at the given kappa.
+   *
+   * Necessary for any sweep over kappa. The normalised von Mises kernel has mean
+   * I0(k)*exp(-k), which FALLS as k rises, so with a fixed amplitude a higher kappa
+   * silently produces fewer symptom-days. Effect size and sample size would then move
+   * together and the sweep would not isolate either. Setting this makes kappa a clean
+   * effect-size axis.
+   */
+  targetPrevalence?: number
 }
 
 /** Symptom slots used by the cohort, with plausible but varied baseline behaviour. */
@@ -373,8 +389,20 @@ export function generateCohort(config: CohortConfig): PatientRecord[] {
 
     const symptoms: SymptomSpec[] = chosen.map((base) => {
       const cyclical = rand.next() < config.cyclicalFraction
+
+      // Solve amplitude for the requested mean prevalence at this kappa, so that
+      // sweeping kappa varies phase concentration and nothing else.
+      const amplitude =
+        config.targetPrevalence !== undefined
+          ? Math.max(
+              0,
+              (config.targetPrevalence - base.baseRate) / meanVonMisesDensity(config.kappa),
+            )
+          : base.amplitude
+
       return {
         ...base,
+        amplitude,
         cyclical,
         kappa: config.kappa,
         // Peak just before onset, the characteristic perimenstrual pattern, with a

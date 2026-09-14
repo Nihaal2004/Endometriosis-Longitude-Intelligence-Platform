@@ -1,0 +1,538 @@
+{
+  "generatedAt": "2026-09-14T18:49:38.600Z",
+  "engineVersion": "0.1.0",
+  "gate": {
+    "minCoverage": 0.6,
+    "minCompleteCycles": 2,
+    "minObservedDays": 21,
+    "minEvents": 4,
+    "alpha": 0.05,
+    "permutations": 2000,
+    "seed": "medtrace-permutation-v1"
+  },
+  "detection": {
+    "kappa": 4,
+    "missingness": {
+      "mode": "mcar",
+      "rate": 0.1
+    },
+    "days": 180,
+    "patients": 60,
+    "results": [
+      {
+        "classifier": "medtrace",
+        "tp": 85,
+        "fp": 2,
+        "tn": 107,
+        "fn": 46,
+        "precision": 0.9770114942528736,
+        "recall": 0.648854961832061,
+        "specificity": 0.981651376146789,
+        "f1": 0.779816513761468,
+        "mcc": 0.6530298173630594,
+        "accuracy": 0.8,
+        "n": 240,
+        "meanCoverage": 0.8954629629629628,
+        "patients": 60
+      },
+      {
+        "classifier": "descriptive",
+        "tp": 119,
+        "fp": 20,
+        "tn": 89,
+        "fn": 12,
+        "precision": 0.8561151079136691,
+        "recall": 0.9083969465648855,
+        "specificity": 0.8165137614678899,
+        "f1": 0.8814814814814815,
+        "mcc": 0.7310807097171068,
+        "accuracy": 0.8666666666666667,
+        "n": 240,
+        "meanCoverage": 0.8954629629629628,
+        "patients": 60
+      },
+      {
+        "classifier": "zero_imputed",
+        "tp": 119,
+        "fp": 21,
+        "tn": 88,
+        "fn": 12,
+        "precision": 0.85,
+        "recall": 0.9083969465648855,
+        "specificity": 0.8073394495412844,
+        "f1": 0.8782287822878228,
+        "mcc": 0.7228330160953524,
+        "accuracy": 0.8625,
+        "n": 240,
+        "meanCoverage": 0.8954629629629628,
+        "patients": 60
+      }
+    ]
+  },
+  "power": [
+    {
+      "kappa": 0,
+      "concentration": 0,
+      "medtrace": {
+        "recall": 0.010416666666666666,
+        "specificity": 0.9903846153846154,
+        "f1": 0.020408163265306124
+      },
+      "descriptive": {
+        "recall": 0.08333333333333333,
+        "specificity": 0.8942307692307693,
+        "f1": 0.1391304347826087
+      }
+    },
+    {
+      "kappa": 0.5,
+      "concentration": 0.24380635037821155,
+      "medtrace": {
+        "recall": 0.06666666666666667,
+        "specificity": 0.9894736842105263,
+        "f1": 0.12389380530973451
+      },
+      "descriptive": {
+        "recall": 0.3523809523809524,
+        "specificity": 0.8210526315789474,
+        "f1": 0.4654088050314466
+      }
+    },
+    {
+      "kappa": 1,
+      "concentration": 0.44750581452356664,
+      "medtrace": {
+        "recall": 0.20388349514563106,
+        "specificity": 1,
+        "f1": 0.33870967741935487
+      },
+      "descriptive": {
+        "recall": 0.6019417475728155,
+        "specificity": 0.865979381443299,
+        "f1": 0.6966292134831461
+      }
+    },
+    {
+      "kappa": 2,
+      "concentration": 0.6985233011887129,
+      "medtrace": {
+        "recall": 0.5684210526315789,
+        "specificity": 0.9809523809523809,
+        "f1": 0.7152317880794701
+      },
+      "descriptive": {
+        "recall": 0.8526315789473684,
+        "specificity": 0.8571428571428571,
+        "f1": 0.8481675392670157
+      }
+    },
+    {
+      "kappa": 3,
+      "concentration": 0.8105395578976934,
+      "medtrace": {
+        "recall": 0.7692307692307693,
+        "specificity": 0.9724770642201835,
+        "f1": 0.8536585365853658
+      },
+      "descriptive": {
+        "recall": 0.8791208791208791,
+        "specificity": 0.8807339449541285,
+        "f1": 0.8695652173913043
+      }
+    },
+    {
+      "kappa": 4,
+      "concentration": 0.8639810215392156,
+      "medtrace": {
+        "recall": 0.6634615384615384,
+        "specificity": 0.9791666666666666,
+        "f1": 0.7885714285714286
+      },
+      "descriptive": {
+        "recall": 0.8846153846153846,
+        "specificity": 0.8854166666666666,
+        "f1": 0.8888888888888888
+      }
+    },
+    {
+      "kappa": 6,
+      "concentration": 0.9127230275240766,
+      "medtrace": {
+        "recall": 0.8541666666666666,
+        "specificity": 0.9807692307692307,
+        "f1": 0.9111111111111111
+      },
+      "descriptive": {
+        "recall": 0.9270833333333334,
+        "specificity": 0.8557692307692307,
+        "f1": 0.8899999999999999
+      }
+    },
+    {
+      "kappa": 8,
+      "concentration": 0.9355475498715179,
+      "medtrace": {
+        "recall": 0.8125,
+        "specificity": 0.9903846153846154,
+        "f1": 0.8914285714285716
+      },
+      "descriptive": {
+        "recall": 0.8958333333333334,
+        "specificity": 0.875,
+        "f1": 0.8820512820512821
+      }
+    }
+  ],
+  "robustness": [
+    {
+      "missingnessRate": 0,
+      "mode": "mcar",
+      "meanCoverage": 1,
+      "gated": {
+        "precision": 0.9861111111111112,
+        "recall": 0.7553191489361702,
+        "f1": 0.855421686746988,
+        "reported": 72
+      },
+      "ungated": {
+        "precision": 0.9861111111111112,
+        "recall": 0.7553191489361702,
+        "f1": 0.855421686746988,
+        "reported": 72
+      },
+      "zeroImputed": {
+        "precision": 0.8653846153846154,
+        "recall": 0.9574468085106383,
+        "f1": 0.9090909090909091
+      }
+    },
+    {
+      "missingnessRate": 0.1,
+      "mode": "mcar",
+      "meanCoverage": 0.8973333333333332,
+      "gated": {
+        "precision": 0.9487179487179487,
+        "recall": 0.7708333333333334,
+        "f1": 0.8505747126436781,
+        "reported": 78
+      },
+      "ungated": {
+        "precision": 0.9487179487179487,
+        "recall": 0.7708333333333334,
+        "f1": 0.8505747126436781,
+        "reported": 78
+      },
+      "zeroImputed": {
+        "precision": 0.8272727272727273,
+        "recall": 0.9479166666666666,
+        "f1": 0.883495145631068
+      }
+    },
+    {
+      "missingnessRate": 0.2,
+      "mode": "mcar",
+      "meanCoverage": 0.7956666666666667,
+      "gated": {
+        "precision": 1,
+        "recall": 0.7289719626168224,
+        "f1": 0.8432432432432433,
+        "reported": 78
+      },
+      "ungated": {
+        "precision": 1,
+        "recall": 0.7289719626168224,
+        "f1": 0.8432432432432433,
+        "reported": 78
+      },
+      "zeroImputed": {
+        "precision": 0.8114754098360656,
+        "recall": 0.9252336448598131,
+        "f1": 0.8646288209606987
+      }
+    },
+    {
+      "missingnessRate": 0.3,
+      "mode": "mcar",
+      "meanCoverage": 0.7078888888888888,
+      "gated": {
+        "precision": 1,
+        "recall": 0.5495495495495496,
+        "f1": 0.7093023255813954,
+        "reported": 61
+      },
+      "ungated": {
+        "precision": 1,
+        "recall": 0.6126126126126126,
+        "f1": 0.7597765363128491,
+        "reported": 68
+      },
+      "zeroImputed": {
+        "precision": 0.8739495798319328,
+        "recall": 0.9369369369369369,
+        "f1": 0.9043478260869565
+      }
+    },
+    {
+      "missingnessRate": 0.4,
+      "mode": "mcar",
+      "meanCoverage": 0.5903333333333334,
+      "gated": {
+        "precision": 1,
+        "recall": 0.05504587155963303,
+        "f1": 0.10434782608695652,
+        "reported": 6
+      },
+      "ungated": {
+        "precision": 0.9655172413793104,
+        "recall": 0.5137614678899083,
+        "f1": 0.6706586826347305,
+        "reported": 58
+      },
+      "zeroImputed": {
+        "precision": 0.7899159663865546,
+        "recall": 0.8623853211009175,
+        "f1": 0.8245614035087718
+      }
+    },
+    {
+      "missingnessRate": 0.5,
+      "mode": "mcar",
+      "meanCoverage": 0.4998888888888887,
+      "gated": {
+        "precision": 0,
+        "recall": 0,
+        "f1": 0,
+        "reported": 0
+      },
+      "ungated": {
+        "precision": 0.9761904761904762,
+        "recall": 0.37962962962962965,
+        "f1": 0.5466666666666667,
+        "reported": 42
+      },
+      "zeroImputed": {
+        "precision": 0.8151260504201681,
+        "recall": 0.8981481481481481,
+        "f1": 0.8546255506607929
+      }
+    },
+    {
+      "missingnessRate": 0.6,
+      "mode": "mcar",
+      "meanCoverage": 0.4061111111111112,
+      "gated": {
+        "precision": 0,
+        "recall": 0,
+        "f1": 0,
+        "reported": 0
+      },
+      "ungated": {
+        "precision": 1,
+        "recall": 0.21428571428571427,
+        "f1": 0.35294117647058826,
+        "reported": 21
+      },
+      "zeroImputed": {
+        "precision": 0.7457627118644068,
+        "recall": 0.8979591836734694,
+        "f1": 0.8148148148148148
+      }
+    },
+    {
+      "missingnessRate": 0,
+      "mode": "mar",
+      "meanCoverage": 1,
+      "gated": {
+        "precision": 0.9871794871794872,
+        "recall": 0.7777777777777778,
+        "f1": 0.8700564971751413,
+        "reported": 78
+      },
+      "ungated": {
+        "precision": 0.9871794871794872,
+        "recall": 0.7777777777777778,
+        "f1": 0.8700564971751413,
+        "reported": 78
+      },
+      "zeroImputed": {
+        "precision": 0.8878504672897196,
+        "recall": 0.9595959595959596,
+        "f1": 0.9223300970873787
+      }
+    },
+    {
+      "missingnessRate": 0.1,
+      "mode": "mar",
+      "meanCoverage": 0.9369999999999998,
+      "gated": {
+        "precision": 1,
+        "recall": 0.7156862745098039,
+        "f1": 0.8342857142857142,
+        "reported": 73
+      },
+      "ungated": {
+        "precision": 1,
+        "recall": 0.7156862745098039,
+        "f1": 0.8342857142857142,
+        "reported": 73
+      },
+      "zeroImputed": {
+        "precision": 0.8648648648648649,
+        "recall": 0.9411764705882353,
+        "f1": 0.9014084507042254
+      }
+    },
+    {
+      "missingnessRate": 0.2,
+      "mode": "mar",
+      "meanCoverage": 0.8758888888888887,
+      "gated": {
+        "precision": 0.9830508474576272,
+        "recall": 0.6170212765957447,
+        "f1": 0.7581699346405228,
+        "reported": 59
+      },
+      "ungated": {
+        "precision": 0.9830508474576272,
+        "recall": 0.6170212765957447,
+        "f1": 0.7581699346405228,
+        "reported": 59
+      },
+      "zeroImputed": {
+        "precision": 0.7884615384615384,
+        "recall": 0.8723404255319149,
+        "f1": 0.8282828282828283
+      }
+    },
+    {
+      "missingnessRate": 0.3,
+      "mode": "mar",
+      "meanCoverage": 0.803666666666667,
+      "gated": {
+        "precision": 1,
+        "recall": 0.5333333333333333,
+        "f1": 0.6956521739130436,
+        "reported": 48
+      },
+      "ungated": {
+        "precision": 1,
+        "recall": 0.5333333333333333,
+        "f1": 0.6956521739130436,
+        "reported": 48
+      },
+      "zeroImputed": {
+        "precision": 0.8444444444444444,
+        "recall": 0.8444444444444444,
+        "f1": 0.8444444444444444
+      }
+    },
+    {
+      "missingnessRate": 0.4,
+      "mode": "mar",
+      "meanCoverage": 0.759888888888889,
+      "gated": {
+        "precision": 0.9803921568627451,
+        "recall": 0.49504950495049505,
+        "f1": 0.6578947368421052,
+        "reported": 51
+      },
+      "ungated": {
+        "precision": 0.9803921568627451,
+        "recall": 0.49504950495049505,
+        "f1": 0.6578947368421052,
+        "reported": 51
+      },
+      "zeroImputed": {
+        "precision": 0.8854166666666666,
+        "recall": 0.8415841584158416,
+        "f1": 0.8629441624365483
+      }
+    },
+    {
+      "missingnessRate": 0.5,
+      "mode": "mar",
+      "meanCoverage": 0.6915555555555553,
+      "gated": {
+        "precision": 0.9523809523809523,
+        "recall": 0.40816326530612246,
+        "f1": 0.5714285714285714,
+        "reported": 42
+      },
+      "ungated": {
+        "precision": 0.9555555555555556,
+        "recall": 0.4387755102040816,
+        "f1": 0.6013986013986014,
+        "reported": 45
+      },
+      "zeroImputed": {
+        "precision": 0.8118811881188119,
+        "recall": 0.8367346938775511,
+        "f1": 0.8241206030150754
+      }
+    },
+    {
+      "missingnessRate": 0.6,
+      "mode": "mar",
+      "meanCoverage": 0.6291111111111111,
+      "gated": {
+        "precision": 1,
+        "recall": 0.17142857142857143,
+        "f1": 0.2926829268292683,
+        "reported": 18
+      },
+      "ungated": {
+        "precision": 1,
+        "recall": 0.3333333333333333,
+        "f1": 0.5,
+        "reported": 35
+      },
+      "zeroImputed": {
+        "precision": 0.8791208791208791,
+        "recall": 0.7619047619047619,
+        "f1": 0.8163265306122449
+      }
+    }
+  ],
+  "fidelity": {
+    "briefsGenerated": 30,
+    "totalClaims": 197,
+    "verifiedClaims": 197,
+    "verificationRate": 1,
+    "keyCoverage": 0.6473265073947668,
+    "mutationsInjected": 165,
+    "mutationsCaught": 165,
+    "mutationCatchRate": 1
+  },
+  "burden": {
+    "patientDays": 520,
+    "meanAdaptiveFields": 6.832692307692308,
+    "meanStaticFields": 9,
+    "reduction": 0.24081196581196584,
+    "fullVocabularyFields": 37,
+    "reductionVsFullVocabulary": 0.8153326403326403,
+    "adaptiveFieldHistogram": {
+      "3": 20,
+      "4": 1,
+      "5": 1,
+      "6": 2,
+      "7": 496
+    },
+    "estimatedSecondsAdaptive": 23.91442307692308,
+    "estimatedSecondsStatic": 31.5,
+    "secondsPerFieldAssumption": 3.5
+  },
+  "latency": {
+    "runs": 40,
+    "recordDays": 180,
+    "p50Ms": 68.81430000000182,
+    "p95Ms": 83.78193499999504,
+    "maxMs": 94.3775999999998,
+    "meanMs": 70.0315174999998,
+    "stageBreakdownMs": {
+      "features": 0.6650024999993548,
+      "patterns": 66.0256725000003,
+      "brief": 0.1131199999997989,
+      "fidelity": 3.2277225000003456
+    }
+  }
+}
