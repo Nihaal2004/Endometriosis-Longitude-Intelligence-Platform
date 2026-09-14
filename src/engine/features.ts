@@ -48,7 +48,20 @@ export interface FeatureContext {
   record: PatientRecord
   window: AnalysisWindow
   config: CycleConfig
+  /**
+   * All cycles segmented from the FULL record. Used for alignment, because a window
+   * that opens mid-cycle still needs to know where that cycle actually began.
+   */
   cycles: Cycle[]
+  /**
+   * Cycles whose onset falls inside the analysis window — the cycles this window's
+   * data actually covers.
+   *
+   * Reporting must use this, never `cycles`. A 92-day window over a 188-day record
+   * contains about three cycles, and quoting the record's six would overstate the
+   * evidence behind every window-scoped number in the brief.
+   */
+  windowCycles: Cycle[]
   aligned: Map<string, CycleDay>
   /** Day records within the window, indexed by date, sorted ascending. */
   daysByDate: Map<string, DayRecord>
@@ -103,6 +116,7 @@ export function buildFeatureContext(
   // beginning mid-cycle still knows where that cycle actually started.
   const cycles = segmentCycles(record.days, config)
   const aligned = alignToCycles(orderedDates, cycles, config)
+  const windowCycles = cycles.filter((c) => c.startDate >= win.start && c.startDate <= win.end)
 
   let loggedDays = 0
   for (const date of orderedDates) {
@@ -116,6 +130,7 @@ export function buildFeatureContext(
     window: win,
     config,
     cycles,
+    windowCycles,
     aligned,
     daysByDate,
     orderedDates,
@@ -356,6 +371,50 @@ export function summariseMedication(ctx: FeatureContext): MedicationSummary {
   }
 
   return { daysWithMedication, byMedication, severeDespiteMedication }
+}
+
+export interface PhaseBin {
+  signedCycleDay: number
+  present: number
+  observed: number
+  rate: number
+}
+
+/**
+ * Occurrence rate per signed cycle day, for the phase heatmap.
+ *
+ * Bins with zero observations are returned with observed = 0 rather than rate = 0, so
+ * the UI can draw "never asked" differently from "asked and absent". Collapsing those
+ * two into one colour is the visual form of the missing-data error.
+ */
+export function phaseProfile(
+  ctx: FeatureContext,
+  symptomId: string,
+  from = -5,
+  to = 8,
+): PhaseBin[] {
+  const bins = new Map<number, { present: number; observed: number }>()
+  for (let d = from; d <= to; d++) bins.set(d, { present: 0, observed: 0 })
+
+  for (const date of ctx.orderedDates) {
+    const aligned = ctx.aligned.get(date)
+    if (!aligned) continue
+    const bin = bins.get(aligned.signedCycleDay)
+    if (!bin) continue
+    const state = observationState(ctx.daysByDate.get(date), symptomId)
+    if (state === 'unknown') continue
+    bin.observed++
+    if (state === 'present') bin.present++
+  }
+
+  return [...bins.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([signedCycleDay, v]) => ({
+      signedCycleDay,
+      present: v.present,
+      observed: v.observed,
+      rate: v.observed > 0 ? v.present / v.observed : Number.NaN,
+    }))
 }
 
 /** Daily total symptom burden, used for the timeline ribbon. Null on unlogged days. */

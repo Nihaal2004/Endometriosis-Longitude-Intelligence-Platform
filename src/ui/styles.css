@@ -1,0 +1,343 @@
+@import 'tailwindcss';
+
+/* ===========================================================================
+   MedTrace design tokens — "editorial warm"
+
+   Two colour systems live here and must not be confused:
+
+   1. PRODUCT colour. Cream ground, aubergine ink, coral reserved exclusively
+      for menstrual bleeding, sage for non-menstrual context. Coral never means
+      "bad" and never labels a series — it means blood, everywhere, always.
+
+   2. CHART colour, prefixed --viz-*. A separate, validated palette. The
+      categorical slots (violet / teal / coral) were checked with the dataviz
+      validator at all-pairs in both modes: worst CVD ΔE 9.6 light, 8.8 dark;
+      worst normal-vision ΔE 27.9 light, 22.6 dark. Light-mode teal sits at
+      2.77:1 against the cream surface, below the 3:1 bar, so every chart using
+      it ships direct labels and a table view rather than relying on the swatch.
+
+   Re-validate before changing any --viz-series-* value:
+     node scripts/validate_palette.js "#6B4FC4,#2AA890,#E2574C" \
+       --mode light --surface "#FBF7F2" --pairs all
+   =========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* --- Surfaces --- */
+  --ground: #fbf7f2;
+  --surface: #fffdfa;
+  --surface-sunken: #f4eee6;
+  --surface-raised: #ffffff;
+
+  /* --- Ink --- */
+  --ink: #2e1b2e;
+  --ink-secondary: #6b5668;
+  --ink-muted: #9a8a97;
+  --hairline: #e6dcd2;
+  --hairline-strong: #d5c7ba;
+
+  /* --- Product accents --- */
+  --bleed: #e2574c;          /* menstrual bleeding, and nothing else */
+  --bleed-soft: #f7d9d5;
+  --sage: #5e7c6b;           /* non-menstrual / baseline */
+  --sage-soft: #dde6e0;
+  --amber: #c07d1a;          /* functional impact */
+  --amber-soft: #f6e6cc;
+  --violet: #6b4fc4;         /* evidence / analysis affordances */
+  --violet-soft: #e6e0f7;
+
+  /* --- Chart: surfaces & chrome --- */
+  --viz-surface: #fbf7f2;
+  --viz-grid: #ebe3d9;
+  --viz-axis: #d5c7ba;
+  --viz-ink: #2e1b2e;
+  --viz-ink-secondary: #6b5668;
+  --viz-ink-muted: #9a8a97;
+
+  /* --- Chart: categorical (validated, fixed order, never cycled) --- */
+  --viz-series-1: #6b4fc4;   /* violet */
+  --viz-series-2: #2aa890;   /* teal   */
+  --viz-series-3: #e2574c;   /* coral  */
+
+  /* --- Chart: sequential (single hue, light -> dark) --- */
+  --viz-seq-0: #f7f1f5;
+  --viz-seq-1: #f0e2ec;
+  --viz-seq-2: #e3c9dc;
+  --viz-seq-3: #d1a6c4;
+  --viz-seq-4: #bb7fa8;
+  --viz-seq-5: #a1588b;
+  --viz-seq-6: #83386c;
+  --viz-seq-7: #5e2049;
+
+  /* --- Chart: diverging (warm <-> cool, neutral gray midpoint) --- */
+  --viz-div-neg-2: #c8412f;
+  --viz-div-neg-1: #e8917f;
+  --viz-div-mid: #ece6df;
+  --viz-div-pos-1: #7fc3b2;
+  --viz-div-pos-2: #1d8a75;
+
+  /* --- Chart: status (fixed, never themed, always with icon + label) --- */
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-serious: #ec835a;
+  --viz-critical: #d03b3b;
+
+  /* --- Type --- */
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow-card: 0 1px 2px rgba(46, 27, 46, 0.04), 0 8px 24px rgba(46, 27, 46, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --ground: #140e14;
+    --surface: #1c141c;
+    --surface-sunken: #110c11;
+    --surface-raised: #241a24;
+
+    --ink: #f6eef4;
+    --ink-secondary: #bfaaba;
+    --ink-muted: #8d7a8a;
+    --hairline: #332632;
+    --hairline-strong: #463545;
+
+    --bleed: #ef7e72;
+    --bleed-soft: #43211f;
+    --sage: #8fb39c;
+    --sage-soft: #23312a;
+    --amber: #e0a94e;
+    --amber-soft: #3a2c15;
+    --violet: #9a80e8;
+    --violet-soft: #2b2143;
+
+    --viz-surface: #171017;
+    --viz-grid: #2c212c;
+    --viz-axis: #463545;
+    --viz-ink: #f6eef4;
+    --viz-ink-secondary: #bfaaba;
+    --viz-ink-muted: #8d7a8a;
+
+    --viz-series-1: #9a80e8;
+    --viz-series-2: #2fa88f;
+    --viz-series-3: #d95f50;
+
+    --viz-seq-0: #1c141b;
+    --viz-seq-1: #2a1d27;
+    --viz-seq-2: #3c2837;
+    --viz-seq-3: #55374c;
+    --viz-seq-4: #714a64;
+    --viz-seq-5: #8f5f7f;
+    --viz-seq-6: #ad789b;
+    --viz-seq-7: #c795b6;
+
+    --viz-div-neg-2: #e0705f;
+    --viz-div-neg-1: #8d4339;
+    --viz-div-mid: #2f262e;
+    --viz-div-pos-1: #2a5f54;
+    --viz-div-pos-2: #47b9a1;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ground: #140e14;
+  --surface: #1c141c;
+  --surface-sunken: #110c11;
+  --surface-raised: #241a24;
+
+  --ink: #f6eef4;
+  --ink-secondary: #bfaaba;
+  --ink-muted: #8d7a8a;
+  --hairline: #332632;
+  --hairline-strong: #463545;
+
+  --bleed: #ef7e72;
+  --bleed-soft: #43211f;
+  --sage: #8fb39c;
+  --sage-soft: #23312a;
+  --amber: #e0a94e;
+  --amber-soft: #3a2c15;
+  --violet: #9a80e8;
+  --violet-soft: #2b2143;
+
+  --viz-surface: #171017;
+  --viz-grid: #2c212c;
+  --viz-axis: #463545;
+  --viz-ink: #f6eef4;
+  --viz-ink-secondary: #bfaaba;
+  --viz-ink-muted: #8d7a8a;
+
+  --viz-series-1: #9a80e8;
+  --viz-series-2: #2fa88f;
+  --viz-series-3: #d95f50;
+
+  --viz-seq-0: #1c141b;
+  --viz-seq-1: #2a1d27;
+  --viz-seq-2: #3c2837;
+  --viz-seq-3: #55374c;
+  --viz-seq-4: #714a64;
+  --viz-seq-5: #8f5f7f;
+  --viz-seq-6: #ad789b;
+  --viz-seq-7: #c795b6;
+
+  --viz-div-neg-2: #e0705f;
+  --viz-div-neg-1: #8d4339;
+  --viz-div-mid: #2f262e;
+  --viz-div-pos-1: #2a5f54;
+  --viz-div-pos-2: #47b9a1;
+}
+
+/* =========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--ink);
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* --- Reusable primitives ------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.hairline {
+  border-color: var(--hairline);
+}
+
+.display {
+  font-family: var(--font-display);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+/* Chips — the primary logging interaction, so they get real hit targets */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.chip:hover {
+  border-color: var(--ink-muted);
+}
+
+.chip[data-selected='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ground);
+}
+
+/* --- Motion -------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Scrollbars ---------------------------------------------------------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --- Print: the clinician brief is meant to be printed ------------------- */
+
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+    font-size: 11pt;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .card {
+    box-shadow: none;
+    border-color: #cccccc;
+    break-inside: avoid;
+  }
+  .print-full {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

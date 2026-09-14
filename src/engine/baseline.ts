@@ -75,7 +75,8 @@ export function detectBaselineChange(
   let priorObserved = 0
   const latestDates: string[] = []
 
-  const completeCycles = ctx.cycles.filter((c) => c.complete)
+  // Window-scoped: "previous cycles" means cycles inside the analysis window.
+  const completeCycles = ctx.windowCycles.filter((c) => c.complete)
   if (completeCycles.length < 2) return null
 
   // The reference cycle is the most recent *complete* one; the trailing partial cycle

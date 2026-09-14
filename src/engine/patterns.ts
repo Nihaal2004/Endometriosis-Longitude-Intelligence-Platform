@@ -569,7 +569,9 @@ export function runPatternEngine(
   }
 
   // --- Gate ---
-  const completeCycles = ctx.cycles.filter((c) => c.complete).length
+  // Window-scoped: a finding computed over this window must be backed by cycles that
+  // fall inside it, not by cycles elsewhere in the record.
+  const completeCycles = ctx.windowCycles.filter((c) => c.complete).length
   const findings: Finding[] = []
   const suppressed: Finding[] = []
 
@@ -608,10 +610,19 @@ function gateReasonFor(
     return 'insufficient_events'
   }
 
-  // Inferential findings must clear the FDR threshold. Descriptive ones (persistence)
-  // carry no test and are reported with their interval instead.
-  if (finding.test && (finding.test.q ?? finding.test.p) >= gate.alpha) {
-    return 'not_significant'
+  // Inferential findings must clear the FDR threshold. Descriptive ones are reported
+  // with their confidence interval instead.
+  //
+  // functional_burden is descriptive: the *counts* ("symptoms limited activity on 23
+  // of 79 days") are what a clinician needs, and they are true regardless of whether
+  // the burden is trending. Its Mann-Kendall test describes only the trend across
+  // cycles. Gating the whole finding on that test suppressed the functional-impact
+  // section of the brief entirely whenever burden happened to be stable — dropping the
+  // element the outcome literature is most consistent about. The trend is reported
+  // separately only when it is significant.
+  const descriptive: PatternKind[] = ['persistence', 'functional_burden']
+  if (finding.test && !descriptive.includes(finding.kind)) {
+    if ((finding.test.q ?? finding.test.p) >= gate.alpha) return 'not_significant'
   }
 
   return null

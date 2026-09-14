@@ -309,8 +309,16 @@ function recompute(
       return total === 0 ? 0 : Math.round((n / total) * 100)
     }
 
-    case 'completeCycles':
-      return Math.max(0, independentOnsets(record.days).length - 1)
+    case 'completeCycles': {
+      // Window-scoped, matching the brief: count onsets that fall inside the analysis
+      // window, and treat one as complete when a later onset exists anywhere in the
+      // record — a cycle that closed just after the window still closed.
+      const onsets = independentOnsets(record.days)
+      const last = onsets[onsets.length - 1]
+      return onsets.filter(
+        (o) => o >= windowStart && o <= windowEnd && last !== undefined && o < last,
+      ).length
+    }
 
     case 'limitingDays':
       return countImpact(scope, (i) => i >= ImpactLevel.ModifiedActivities)

@@ -295,7 +295,9 @@ export function generateBrief(
   const label = (id?: string) => (id ? clinicalLabel(id, config.customLabels) : '')
 
   // --- Recorded period and coverage -----------------------------------------
-  const cycleSummary = summariseCycles(ctx.cycles)
+  // Window-scoped, not record-scoped: quoting the whole record's cycle count in a
+  // 92-day brief would overstate the evidence behind every number beneath it.
+  const cycleSummary = summariseCycles(ctx.windowCycles)
   claims.push(
     claim(
       'period',
