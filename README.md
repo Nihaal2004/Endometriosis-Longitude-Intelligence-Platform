@@ -14,9 +14,10 @@ It does not diagnose, does not score risk, does not stage disease, and does not 
 
 ```bash
 npm install
-npm run dev     # http://localhost:5173
-npm test        # 111 tests
-npm run eval    # regenerate all reported metrics (~60s)
+npm run dev         # http://localhost:5173
+npm test            # 111 tests
+npm run eval        # regenerate all reported metrics (~60s)
+npm run android:open  # same app, native Android build — see docs/MOBILE.md
 ```
 
 Three demo patients ship with the prototype, each exercising a different engine behaviour: **Maya** (a clear perimenstrual pattern), **Priya** (persistent non-cyclical pain with a treatment episode), and **Aisha** (a sparse record where the engine withholds nearly everything).
@@ -56,6 +57,7 @@ Three properties do the work:
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements, data model, acceptance criteria |
 | [`docs/COMPETITIVE_ANALYSIS.md`](docs/COMPETITIVE_ANALYSIS.md) | Methodology compared against Flo, Clue, Phendo, Bearable and Guava, with the divergences measured |
 | [`docs/PRIVACY.md`](docs/PRIVACY.md) | Privacy and ethics position: what's true now, what's deferred and why, how the demo data is generated |
+| [`docs/MOBILE.md`](docs/MOBILE.md) | Running the same app as a native Android build via Capacitor |
 
 ## Headline results
 
