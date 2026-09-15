@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { PERSONAS, getPersona } from './data/personas'
-import { useApp } from './ui/store'
+import { MY_RECORD_ID, useApp } from './ui/store'
+import Lock from './ui/Lock'
 import Today from './ui/screens/Today'
 import Patterns from './ui/screens/Patterns'
 import Timeline from './ui/screens/Timeline'
@@ -21,13 +22,31 @@ const NAV = [
 function PersonaSwitcher() {
   const personaId = useApp((s) => s.personaId)
   const setPersona = useApp((s) => s.setPersona)
-  const persona = getPersona(personaId)
+  const deleteMyRecord = useApp((s) => s.deleteMyRecord)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const onMe = personaId === MY_RECORD_ID
+  const demoPersona = onMe ? null : getPersona(personaId)
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          onClick={() => setPersona(MY_RECORD_ID)}
+          className="focus-ring rounded-full px-3 py-1.5 text-[13px] font-semibold transition-colors"
+          style={{
+            background: onMe ? 'var(--ink)' : 'transparent',
+            color: onMe ? 'var(--ground)' : 'var(--ink-secondary)',
+            border: `1px solid ${onMe ? 'var(--ink)' : 'var(--hairline-strong)'}`,
+          }}
+          aria-pressed={onMe}
+        >
+          My record
+        </button>
+
+        <span className="mx-1.5 h-4 w-px" style={{ background: 'var(--hairline-strong)' }} />
+
         <span className="mr-1 text-[11px] font-medium uppercase tracking-wider" style={{ color: 'var(--ink-muted)' }}>
-          Demo patient
+          Demo patients (synthetic)
         </span>
         {PERSONAS.map((p) => (
           <button
@@ -46,9 +65,47 @@ function PersonaSwitcher() {
           </button>
         ))}
       </div>
-      <p className="max-w-2xl text-[12.5px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
-        {persona.demonstrates}
-      </p>
+
+      {onMe ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="max-w-2xl text-[12.5px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+            Your own record. Nothing here is synthetic — it starts empty and only contains what you log.
+          </p>
+          {!confirmingDelete ? (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="focus-ring text-[12px] underline shrink-0"
+              style={{ color: 'var(--ink-muted)' }}
+            >
+              Delete my data
+            </button>
+          ) : (
+            <span className="flex shrink-0 items-center gap-2 text-[12px]" style={{ color: 'var(--ink-secondary)' }}>
+              Permanently erase everything you've logged?
+              <button
+                onClick={() => {
+                  deleteMyRecord()
+                  setConfirmingDelete(false)
+                }}
+                className="focus-ring rounded-full px-2.5 py-1 font-medium"
+                style={{ background: 'var(--ink)', color: 'var(--ground)', border: 'none' }}
+              >
+                Yes, delete
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="focus-ring underline"
+              >
+                Cancel
+              </button>
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className="max-w-2xl text-[12.5px] leading-relaxed" style={{ color: 'var(--ink-muted)' }}>
+          {demoPersona?.demonstrates}
+        </p>
+      )}
     </div>
   )
 }
@@ -78,7 +135,8 @@ function ThemeToggle() {
   )
 }
 
-export default function App() {
+function AppShell() {
+  const personaId = useApp((s) => s.personaId)
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ground)' }}>
       <header
@@ -135,7 +193,10 @@ export default function App() {
       <main className="print-full mx-auto w-full max-w-6xl px-5 pb-24 pt-5">
         <Routes>
           <Route path="/" element={<Navigate to="/today" replace />} />
-          <Route path="/today" element={<Today />} />
+          {/* Keyed on personaId: local form state (bleeding, pain, narrative text...)
+              must reset when switching persona, not carry over from whichever record
+              was active a moment ago. */}
+          <Route path="/today" element={<Today key={personaId} />} />
           <Route path="/patterns" element={<Patterns />} />
           <Route path="/timeline" element={<Timeline />} />
           <Route path="/brief" element={<Brief />} />
@@ -146,4 +207,15 @@ export default function App() {
       </main>
     </div>
   )
+}
+
+/**
+ * Gates the whole app behind the passphrase lock (crypto.ts, Lock.tsx) — the zustand
+ * store's persisted state is never touched until a passphrase has been set or
+ * validated, so AppShell only ever mounts once there's a key to decrypt with.
+ */
+export default function App() {
+  const [unlocked, setUnlocked] = useState(false)
+  if (!unlocked) return <Lock onUnlocked={() => setUnlocked(true)} />
+  return <AppShell />
 }

@@ -30,42 +30,62 @@ security later," but which specific harms we are designing against.
 
 | Property | State | Where enforced |
 |---|---|---|
-| Real patient data | **Never collected.** All three demo patients (Maya, Priya, Aisha) are synthetically generated from a seeded statistical process — see §4 below and `src/data/generator.ts`. | By construction — there is no data-entry path that reaches a backend; there is no backend. |
-| Storage | Browser `localStorage` only, on the device the app runs on. Nothing leaves the device. | No network calls exist in `src/` outside the optional LLM-polish path, which sends only already-computed, already-verified claim text — never raw day records. |
-| Identity | No exact date of birth, address, or national ID is in the data model at all — not encrypted, not collected. | `PRD.md` §5: baseline profile uses `ageRange`, not DOB. |
+| Real patient data | Nothing prevents a real user from typing their own symptoms into "My record" (`src/data/myRecord.ts`) — that mode exists precisely so this is a working tool, not just a demo. The three named personas (Maya, Priya, Aisha) remain synthetic, generated from a seeded statistical process — see §5 below. | The distinction is structural and visible in the UI: "My record" and "Demo patients (synthetic)" are separate, clearly labelled controls (`App.tsx`), never merged. |
+| **Encryption at rest** | **Implemented, not deferred.** Everything persisted — the day-by-day record, free-text narratives, baseline profile — is encrypted with AES-GCM-256 before it touches `localStorage`. The key is derived from a passphrase via PBKDF2 (SHA-256, 200,000 iterations) that the user sets on first use. | `src/ui/crypto.ts` (7 tests, `crypto.test.ts`), wired into the zustand store's persistence in `src/ui/store.ts`. |
+| **App lock** | **Implemented.** The whole app is gated behind `Lock.tsx` until the correct passphrase is supplied — nothing in the store is readable or writable before that. A wrong passphrase is rejected (AES-GCM's authentication tag fails to verify) rather than silently returning garbage. | `src/ui/Lock.tsx` |
+| **Data deletion** | **Implemented for the real record.** "Delete my data" (visible in the persona switcher while on "My record") and "Forgot your passcode?" on the lock screen both permanently erase what's stored on the device — there is no soft-delete, no recovery, by design. | `App.tsx` (`deleteMyRecord`), `Lock.tsx` (`resetDevice`) |
+| Storage location | Still browser `localStorage` only, on the device the app runs on — now encrypted, but still never leaves the device. | No network calls exist in `src/` outside the optional LLM-polish path, which sends only already-computed, already-verified claim text — never raw day records. |
+| Identity | No exact date of birth, address, or national ID is in the data model at all. | `PRD.md` §5: baseline profile uses `ageRange`, not DOB. |
 | Sensitive-domain fields | Sexual-domain symptoms (`dyspareunia`, `post_coital_pain`, `intimacy_avoidance`) are marked `sensitive: true` in `src/engine/symptoms.ts` and are structurally excluded from the adaptive daily suggestion list (`adaptive.ts:108`) — they only appear if the patient explicitly opts in via "add another symptom," never by default. | `src/engine/adaptive.ts`, `src/engine/symptoms.ts` |
-| Sharing | Nothing is transmitted automatically. The brief is a document the patient would choose to show or export — there is no clinician account, no auto-sync, no third party with access. | Architecture — no such integration exists. |
+| Sharing | Nothing is transmitted automatically. The brief is a document the patient would choose to show, print or export — there is no clinician account, no auto-sync, no third party with access. | Architecture — no such integration exists. |
 
-## 3. What is explicitly deferred, and why that's an honest position rather than a gap being hidden
+## 3. The honest limit of the encryption model
 
-A prototype whose job is to validate an *analytical method* (do the statistics correctly
-detect real patterns?) does not need a production security stack to answer that
-question, and building one prematurely would spend review-cycle time on infrastructure
-instead of on the thing actually being evaluated: whether the engine's findings are
-trustworthy. So the following are **deferred, not skipped**:
+This is real client-side encryption, not a promise of it — but it is *client-side*
+encryption, and that has a specific, stated ceiling:
 
-| Deferred | Required before any real patient data | Rough sequencing |
+- **The passphrase has no recovery path, by design.** It is never written to disk in
+  any form — not hashed, not as a hint. Forgetting it means the local data is
+  genuinely unrecoverable. This is the same property that makes a stolen device
+  useless to an attacker without the passphrase; there is no middle ground where both
+  "recoverable if forgotten" and "useless if stolen" are true at once without a
+  server to hold a recovery key, which this prototype does not have.
+- **It protects the data at rest on this device — not the running app.** While the
+  app is open and unlocked, symptom data exists in memory and in the DOM, same as any
+  client-side app. This is encryption against a stolen or inspected *device*, not
+  against someone reading over your shoulder while it's open.
+- **There is exactly one user per device-passphrase pair.** There is no concept of
+  multiple accounts, multi-device sync, or a clinician holding their own key — those
+  remain genuinely deferred (§4).
+
+## 4. What is still explicitly deferred, and why
+
+The items below are still not built, honestly, because they require a server this
+prototype does not have and should not grow prematurely — encryption and app-lock
+did not require one, so they moved out of this list; these do:
+
+| Deferred | Required before any real patient data leaves this device | Rough sequencing |
 |---|---|---|
-| Authentication | Yes — before any account exists | 1st |
-| Encryption at rest | Yes — before any data leaves `localStorage`-only mode | 1st (alongside auth) |
-| Consent records (what was agreed to, when, versioned) | Yes — before first real data entry | 2nd |
-| Server sync / backend | Yes — only once auth + encryption exist | 2nd |
-| Audit log (who viewed what, when) | Yes — before any clinician-facing sharing | 3rd |
-| Share grants with expiry (a brief link that expires, not a standing account) | Yes — this is how "sharing is a per-report decision" (PRD §2) becomes real rather than aspirational | 3rd |
-| Data export & deletion (right to be forgotten) | Yes — regulatory requirement in most jurisdictions handling health data | 3rd |
+| Multi-device sync / backend account | Yes — a server is required by definition | 1st |
+| Consent records (what was agreed to, when, versioned) | Yes — before any data leaves a single device | 1st |
+| Audit log (who viewed what, when) | Yes — before any clinician-facing sharing | 2nd |
+| Share grants with expiry (a brief link that expires, not a standing account) | Yes — this is how "sharing is a per-report decision" (PRD §2) becomes real rather than aspirational | 2nd |
+| Biometric unlock (as an alternative to the passphrase) | No — usability improvement, not a safety requirement | 3rd |
+| Server-side data export in a portable format | Yes, once sync exists — locally, "Delete my data" and the Brief's PDF export already cover the single-device case | 3rd |
 
-**The guardrail that makes deferral safe:** every document that describes this
-prototype — `README.md`, `PRD.md`, `BUILDLOG.md` — states plainly that it "must never
-hold real patient data" in its current form. That sentence is the actual safeguard
-right now, and it is backed by there being no code path that would accept real
-patient input even if someone tried (no auth means no session to attach real identity
-to; no backend means there's nowhere for it to go).
+**The guardrail that still applies:** the app never transmits day-record data anywhere
+— there is no backend to receive it even if the UI tried. What changed is that the
+*local* copy is no longer a plaintext promise-to-secure-later; it is actually
+encrypted, today.
 
-## 4. How the data actually used in the demo is made
+## 5. How the *demo* data is made — separately from anything a real user enters
 
-None of it is real. All three personas and every evaluation cohort come from
-`src/data/generator.ts`, a **generative statistical model**, not recorded, scraped, or
-anonymised real data:
+None of the three named personas is real. Maya, Priya and Aisha, and every evaluation
+cohort, come from `src/data/generator.ts`, a **generative statistical model**, not
+recorded, scraped, or anonymised real data. "My record" (§2) is the opposite of this
+by construction — it starts with zero days and contains only what a real user actually
+logs, encrypted the same way regardless of whether that user is one of this team
+demoing to a panel or someone using the app for themselves.
 
 1. **Cycles are generated first** — length drawn from a clipped normal distribution
    (21–45 days, realistic bounds), bleed duration similarly, seeded per patient.
@@ -95,13 +115,20 @@ independently knows whether a real patient's bowel pain is "truly" cyclical, so 
 data has no ground truth to score against even if we had ethics approval to collect it,
 which we do not, and are not seeking at this stage.
 
-## 5. What a panel question here should get as an answer
+## 6. What a panel question here should get as an answer
 
-- *"Is any of this real patient data?"* — No. Everything is synthetically generated
-  with known ground truth, specifically so detection accuracy can be measured against
-  an answer nobody has to guess at.
-- *"What happens if this became a real product tomorrow?"* — Nothing does, until
-  §3's list is built, in the stated order, starting with auth and encryption.
+- *"Is any of the Maya/Priya/Aisha data real patient data?"* — No. Synthetically
+  generated with known ground truth, specifically so detection accuracy can be
+  measured against an answer nobody has to guess at.
+- *"Is data encrypted, or is that still a promise?"* — Implemented: AES-GCM-256, key
+  derived via PBKDF2 from a user-set passphrase, 7 passing tests including that a
+  wrong passphrase is rejected and that identical plaintext never produces identical
+  ciphertext twice. Demonstrable live — the lock screen is the first thing the app
+  shows.
+- *"What happens if this became a real multi-user product tomorrow?"* — The
+  single-device encryption and app-lock already built stay exactly as they are; what's
+  still missing is everything that requires a server — sync, consent records, audit
+  logging, expiring share links (§4).
 - *"Why is sexual-health data a separate concern here?"* — because it's already
   structurally separated in the code (`sensitive: true`, opt-in only, never
   auto-suggested) — a technical control, not just a policy statement.
@@ -110,3 +137,6 @@ which we do not, and are not seeking at this stage.
   adaptive planner's whole design (≤8 fields/day, §PRD 8) exists partly *because*
   burden and consent-to-continue are linked — a tool nobody keeps using has
   effectively revoked consent through disuse.
+- *"What if someone forgets their passcode?"* — Their local data is genuinely gone.
+  Stated on the lock screen itself before they set one, not discovered after the
+  fact — the same property that makes a stolen device useless to an attacker.

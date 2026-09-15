@@ -265,7 +265,7 @@ The 59.5% figure is deliberately reported rather than hidden. The remainder are 
 5. **Only cyclicity has labelled ground truth.** Trend, co-occurrence, treatment-response and baseline-change detection are exercised by unit tests but not scored on a labelled cohort.
 6. **The ratio-rule baselines are our reimplementations**, not Flo's or Clue's actual algorithms, which are not public. They isolate the contribution of a design decision; they are not a benchmark against any named product.
 7. **No clinician has read a brief** and no patient has used the app. Readability, relevance and consultation fit are entirely unevaluated.
-8. **No production safeguards exist** — no auth, encryption, consent or audit. This prototype must never hold real patient data.
+8. **Single-device safeguards exist (encryption at rest, app-lock, local deletion — `docs/PRIVACY.md`); multi-device ones don't.** No account system, sync, consent records or audit log, because those require a server this prototype deliberately doesn't have.
 
 ---
 

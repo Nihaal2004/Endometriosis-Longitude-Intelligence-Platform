@@ -14,7 +14,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { CycleRing, type RingDay } from '../charts'
-import { useAnalysis, useApp, useCustomLabels, useRecord } from '../store'
+import { MY_RECORD_ID, useAnalysis, useApp, useCustomLabels, useRecord } from '../store'
+import type { MyProfileInput } from '../../data/myRecord'
 import { planDailyQuestions, explainDormancy } from '../../engine/adaptive'
 import { symptomLabel, getSymptom, SYMPTOMS } from '../../engine/symptoms'
 import { BLEEDING_LEVELS, ImpactLevel, IMPACT_LABELS, type BleedingLevel, type DayRecord, type SymptomObservation } from '../../engine/types'
@@ -37,6 +38,11 @@ export default function Today() {
   const { ctx } = useAnalysis()
   const upsertDay = useApp((s) => s.upsertDay)
   const customLabels = useCustomLabels()
+  const personaId = useApp((s) => s.personaId)
+  const onboarded = useApp((s) => s.onboarded)
+  const myProfile = useApp((s) => s.myProfile)
+  const setMyProfile = useApp((s) => s.setMyProfile)
+  const completeOnboarding = useApp((s) => s.completeOnboarding)
 
   const today = ctx.orderedDates[ctx.orderedDates.length - 1] ?? record.days[record.days.length - 1]?.date
   const existing = ctx.daysByDate.get(today)
@@ -173,7 +179,11 @@ export default function Today() {
   )
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+    <div className="flex flex-col gap-5">
+      {personaId === MY_RECORD_ID && !onboarded && (
+        <OnboardingCard profile={myProfile} onSave={setMyProfile} onDone={completeOnboarding} />
+      )}
+      <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
       {/* ---------------- Cycle ring ---------------- */}
       <section className="card flex flex-col items-center p-5">
         <CycleRing
@@ -528,7 +538,102 @@ export default function Today() {
           </div>
         )}
       </section>
+      </div>
     </div>
+  )
+}
+
+function OnboardingCard({
+  profile,
+  onSave,
+  onDone,
+}: {
+  profile: MyProfileInput
+  onSave: (p: MyProfileInput) => void
+  onDone: () => void
+}) {
+  const [ageRange, setAgeRange] = useState(profile.ageRange ?? '')
+  const [diagnosisStatus, setDiagnosisStatus] = useState(profile.diagnosisStatus ?? '')
+  const [cycleRegularity, setCycleRegularity] = useState(profile.cycleRegularity ?? '')
+
+  function start() {
+    onSave({
+      ageRange: ageRange || undefined,
+      diagnosisStatus: (diagnosisStatus || undefined) as MyProfileInput['diagnosisStatus'],
+      cycleRegularity: (cycleRegularity || undefined) as MyProfileInput['cycleRegularity'],
+    })
+    onDone()
+  }
+
+  return (
+    <section className="card p-5 sm:p-6">
+      <h2 style={{ fontSize: 18 }}>Before you start</h2>
+      <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+        Everything below is optional and can be skipped entirely — the engine needs none of it to
+        work, and nothing here is shared with anyone. It only helps the brief address you
+        correctly.
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <label className="text-[13px]">
+          <span className="mb-1 block font-medium" style={{ color: 'var(--ink)' }}>Age range</span>
+          <input
+            value={ageRange}
+            onChange={(e) => setAgeRange(e.target.value)}
+            placeholder="e.g. 24"
+            className="focus-ring w-full rounded-lg px-3 py-2 text-[13.5px]"
+            style={{ border: '1px solid var(--hairline-strong)', background: 'var(--surface)', color: 'var(--ink)' }}
+          />
+        </label>
+
+        <label className="text-[13px]">
+          <span className="mb-1 block font-medium" style={{ color: 'var(--ink)' }}>Diagnosis status</span>
+          <select
+            value={diagnosisStatus}
+            onChange={(e) => setDiagnosisStatus(e.target.value)}
+            className="focus-ring w-full rounded-lg px-3 py-2 text-[13.5px]"
+            style={{ border: '1px solid var(--hairline-strong)', background: 'var(--surface)', color: 'var(--ink)' }}
+          >
+            <option value="">Prefer not to say</option>
+            <option value="undiagnosed">Undiagnosed</option>
+            <option value="suspected">Suspected</option>
+            <option value="confirmed">Confirmed</option>
+          </select>
+        </label>
+
+        <label className="text-[13px]">
+          <span className="mb-1 block font-medium" style={{ color: 'var(--ink)' }}>Cycle regularity</span>
+          <select
+            value={cycleRegularity}
+            onChange={(e) => setCycleRegularity(e.target.value)}
+            className="focus-ring w-full rounded-lg px-3 py-2 text-[13.5px]"
+            style={{ border: '1px solid var(--hairline-strong)', background: 'var(--surface)', color: 'var(--ink)' }}
+          >
+            <option value="">Not sure</option>
+            <option value="regular">Regular</option>
+            <option value="variable">Variable</option>
+            <option value="highly_irregular">Highly irregular</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-4 flex gap-3">
+        <button
+          onClick={start}
+          className="focus-ring rounded-full px-5 py-2.5 text-[14px] font-semibold"
+          style={{ background: 'var(--ink)', color: 'var(--ground)', border: 'none' }}
+        >
+          Start tracking
+        </button>
+        <button
+          onClick={onDone}
+          className="focus-ring rounded-full px-5 py-2.5 text-[14px]"
+          style={{ border: '1px solid var(--hairline-strong)', background: 'transparent', color: 'var(--ink-secondary)' }}
+        >
+          Skip for now
+        </button>
+      </div>
+    </section>
   )
 }
 

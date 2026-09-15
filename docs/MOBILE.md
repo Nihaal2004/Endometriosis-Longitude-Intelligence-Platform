@@ -35,9 +35,11 @@ Studio project. In Android Studio:
    e.g. Pixel 8, API 34+) if you don't have one.
 3. Press **Run** (▶) with that emulator selected.
 
-The app launches with the same persona switcher, Today/Patterns/Timeline/Brief/
-Validation/Method screens, running fully offline — everything is bundled into the
-APK, there is no server to reach.
+The app launches to the same passphrase lock screen as the web version — set one on
+first launch — then the same persona switcher, Today/Patterns/Timeline/Brief/
+Validation/Method screens, running fully offline. Everything is bundled into the
+APK and the encrypted store lives in the app's own local storage on the device;
+there is no server to reach either way.
 
 ## After changing the web app
 

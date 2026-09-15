@@ -29,9 +29,9 @@ Symptoms accumulate across days, cycles, treatments and years. A consultation se
 
 ## 3. Prototype scope
 
-**In scope (built):** onboarding-free demo personas; adaptive daily check-in at three depths; free-text narrative input with rule-based extraction and patient review (see `docs/NLP.md`); tri-state observation model; cycle segmentation and phase alignment; the feature and pattern engines; the fidelity checker; the consultation brief with per-sentence evidence and PDF export; timeline; the validation harness and in-app metrics screen.
+**In scope (built):** onboarding-free demo personas alongside a real, non-synthetic "My record" mode with brief optional onboarding; passphrase-derived encryption at rest and an app-lock screen, with local data deletion (see `docs/PRIVACY.md`); adaptive daily check-in at three depths; free-text narrative input with rule-based extraction and patient review (see `docs/NLP.md`); tri-state observation model; cycle segmentation and phase alignment; the feature and pattern engines; the fidelity checker; the consultation brief with per-sentence evidence and PDF export; timeline; the validation harness and in-app metrics screen.
 
-**Explicitly deferred (not built, and not pretended):** authentication, encryption at rest, server sync, consent records, audit logs, share grants with expiry, biometric lock, data export and deletion flows, and the offline-first sync layer. These are production requirements; this prototype stores state in `localStorage` and should never hold real patient data.
+**Explicitly deferred (not built, and not pretended):** multi-device accounts and sync, consent records, audit logs, share grants with expiry, and biometric unlock as an alternative to the passphrase. These require a server this prototype deliberately doesn't have — see `docs/PRIVACY.md` §4 for the reasoning and sequencing.
 
 ## 4. Users
 

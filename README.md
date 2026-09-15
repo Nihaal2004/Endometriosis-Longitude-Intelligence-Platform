@@ -15,12 +15,12 @@ It does not diagnose, does not score risk, does not stage disease, and does not 
 ```bash
 npm install
 npm run dev         # http://localhost:5173
-npm test            # 129 tests
+npm test            # 136 tests
 npm run eval        # regenerate all reported metrics (~60s)
 npm run android:open  # same app, native Android build — see docs/MOBILE.md
 ```
 
-Three demo patients ship with the prototype, each exercising a different engine behaviour: **Maya** (a clear perimenstrual pattern), **Priya** (persistent non-cyclical pain with a treatment episode), and **Aisha** (a sparse record where the engine withholds nearly everything).
+The app opens on a passphrase lock screen — set one on first run, everything stored is then encrypted with a key derived from it (`docs/PRIVACY.md`). After unlocking, **"My record" is the default**: a real, empty record that only ever contains what you actually log. Three synthetic demo patients are available alongside it, each exercising a different engine behaviour: **Maya** (a clear perimenstrual pattern), **Priya** (persistent non-cyclical pain with a treatment episode), and **Aisha** (a sparse record where the engine withholds nearly everything).
 
 ## Screens
 
@@ -41,7 +41,7 @@ entry → cycle segmentation → feature engine → pattern engine
       → fidelity check → patient review → clinician
 ```
 
-Three properties do the work:
+Four properties do the work:
 
 **Missing data is never zero.** Every symptom-day is `present`, `absent`, or `unknown`, and `unknown` is excluded from every denominator. A day you skipped contributes to nothing, and coverage is reported alongside every finding.
 
@@ -51,6 +51,8 @@ Three properties do the work:
 
 **Free text goes through the same rule, not around it.** The Today screen also accepts a narrative ("terrible cramps during my period") and extracts symptom, severity and negation with a deterministic clause-level rule engine — not a trained model — shown to the patient as an editable, dismissible review list before anything is saved. See `docs/NLP.md`.
 
+**Nothing is stored in the clear.** The entire persisted record — real or demo-session edits alike — is encrypted (AES-GCM-256, PBKDF2-derived key) behind a passphrase set on first use. There is no recovery path if it's forgotten, by design: the same property that makes a stolen device useless without it. See `docs/PRIVACY.md`.
+
 ## Documentation
 
 | Document | Contents |
@@ -58,7 +60,7 @@ Three properties do the work:
 | [`BUILDLOG.md`](BUILDLOG.md) | Methods and their rationale, full evaluation results with interpretation, and the defects found and fixed |
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements, data model, acceptance criteria |
 | [`docs/COMPETITIVE_ANALYSIS.md`](docs/COMPETITIVE_ANALYSIS.md) | Methodology compared against Flo, Clue, Phendo, Bearable and Guava, with the divergences measured |
-| [`docs/PRIVACY.md`](docs/PRIVACY.md) | Privacy and ethics position: what's true now, what's deferred and why, how the demo data is generated |
+| [`docs/PRIVACY.md`](docs/PRIVACY.md) | Privacy and ethics position: encryption at rest and app-lock (implemented, not deferred), what's still deferred and why, how the demo data is generated |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | Running the same app as a native Android build via Capacitor |
 | [`docs/NLP.md`](docs/NLP.md) | Free-text symptom extraction: what it is, why it's rule-based not trained ML, its limitations |
 
@@ -77,7 +79,7 @@ A plain ratio rule beats us on F1 — and reports ten times as many patterns tha
 
 ## Status
 
-Prototype. No authentication, encryption, sync, consent or audit layer — all deferred and none pretended. It stores state in `localStorage` and must never hold real patient data.
+Prototype. Data is encrypted at rest (AES-GCM-256, passphrase-derived) and the app is locked behind that passphrase — see `docs/PRIVACY.md`. Still no multi-device sync, consent records, or audit layer, because those require a server this prototype deliberately doesn't have; all deferred and none pretended.
 
 ## Stack
 
