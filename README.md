@@ -15,7 +15,7 @@ It does not diagnose, does not score risk, does not stage disease, and does not 
 ```bash
 npm install
 npm run dev         # http://localhost:5173
-npm test            # 111 tests
+npm test            # 129 tests
 npm run eval        # regenerate all reported metrics (~60s)
 npm run android:open  # same app, native Android build — see docs/MOBILE.md
 ```
@@ -26,7 +26,7 @@ Three demo patients ship with the prototype, each exercising a different engine 
 
 | Screen | What it shows |
 |---|---|
-| **Today** | The adaptive check-in — ~7 fields out of a 100+ field model, with the skipped questions explained |
+| **Today** | The adaptive check-in — ~7 fields out of a 100+ field model, with the skipped questions explained. Also takes a free-text narrative, extracted into reviewable structured entries — see `docs/NLP.md` |
 | **Patterns** | Cycle-phase heatmap, findings with test/effect size/CI/coverage, and findings *withheld* with reasons |
 | **Timeline** | Symptom burden against treatment periods and healthcare events |
 | **Brief** | The clinician one-pager; click any sentence for its evidence |
@@ -49,6 +49,8 @@ Three properties do the work:
 
 **No number is written by a language model.** Sentences are templated; numeric slots come from computed findings. A fidelity checker then re-derives every asserted number from the raw records through a *separately written* implementation and drops any claim that disagrees. In evaluation it caught 194 of 194 deliberately injected errors.
 
+**Free text goes through the same rule, not around it.** The Today screen also accepts a narrative ("terrible cramps during my period") and extracts symptom, severity and negation with a deterministic clause-level rule engine — not a trained model — shown to the patient as an editable, dismissible review list before anything is saved. See `docs/NLP.md`.
+
 ## Documentation
 
 | Document | Contents |
@@ -58,6 +60,7 @@ Three properties do the work:
 | [`docs/COMPETITIVE_ANALYSIS.md`](docs/COMPETITIVE_ANALYSIS.md) | Methodology compared against Flo, Clue, Phendo, Bearable and Guava, with the divergences measured |
 | [`docs/PRIVACY.md`](docs/PRIVACY.md) | Privacy and ethics position: what's true now, what's deferred and why, how the demo data is generated |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | Running the same app as a native Android build via Capacitor |
+| [`docs/NLP.md`](docs/NLP.md) | Free-text symptom extraction: what it is, why it's rule-based not trained ML, its limitations |
 
 ## Headline results
 

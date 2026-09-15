@@ -12,13 +12,14 @@
  *     so it is stated on the screen where it happens.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CycleRing, type RingDay } from '../charts'
 import { useAnalysis, useApp, useCustomLabels, useRecord } from '../store'
 import { planDailyQuestions, explainDormancy } from '../../engine/adaptive'
 import { symptomLabel, getSymptom, SYMPTOMS } from '../../engine/symptoms'
 import { BLEEDING_LEVELS, ImpactLevel, IMPACT_LABELS, type BleedingLevel, type DayRecord, type SymptomObservation } from '../../engine/types'
 import { addDays } from '../../engine/cycles'
+import { extractFromNarrative, type NarrativeExtraction } from '../../engine/nlp'
 
 const IMPACT_DOMAINS = ['Work', 'Education', 'Exercise', 'Sleep', 'Household', 'Social', 'Concentration', 'Mood']
 
@@ -56,6 +57,34 @@ export default function Today() {
   const [meds, setMeds] = useState<string[]>(existing?.medications?.map((m) => m.label) ?? [])
   const [showMore, setShowMore] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // ---------------- Free-text narrative -> structured extraction ----------------
+  const [narrative, setNarrative] = useState<string>(existing?.note ?? '')
+  const extraction: NarrativeExtraction | null = useMemo(
+    () => (narrative.trim() ? extractFromNarrative(narrative) : null),
+    [narrative],
+  )
+  // Per-match review state, keyed by symptomId: whether the patient keeps this
+  // extracted entry, and the severity to actually save (editable — the extractor's
+  // guess is a proposal, never applied silently).
+  const [narrativeIncluded, setNarrativeIncluded] = useState<Record<string, boolean>>({})
+  const [narrativeSeverity, setNarrativeSeverity] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    if (!extraction) return
+    setNarrativeIncluded((prev) => {
+      const next = { ...prev }
+      for (const m of extraction.matches) if (!(m.symptomId in next)) next[m.symptomId] = true
+      return next
+    })
+    setNarrativeSeverity((prev) => {
+      const next = { ...prev }
+      for (const m of extraction.matches) {
+        if (!(m.symptomId in next) && m.severity !== undefined) next[m.symptomId] = m.severity
+      }
+      return next
+    })
+  }, [extraction])
 
   const ringDays: RingDay[] = useMemo(() => {
     const currentCycle = ctx.cycles[ctx.cycles.length - 1]
@@ -107,6 +136,22 @@ export default function Today() {
         : { state: 'absent' }
     }
 
+    // Narrative-derived entries are a separate, explicitly patient-reviewed source —
+    // applied after the chip-based ones so a confirmed edit from the review list wins.
+    // An explicit denial ("no nausea today") is recorded as `absent`, not left
+    // `unknown`: the patient answered the question, just via text instead of a chip.
+    if (extraction) {
+      for (const m of extraction.matches) {
+        if (!narrativeIncluded[m.symptomId]) continue
+        const graded = getSymptom(m.symptomId)?.graded !== false
+        symptoms[m.symptomId] = m.present
+          ? graded
+            ? { state: 'present', severity: narrativeSeverity[m.symptomId] ?? m.severity ?? 5 }
+            : { state: 'present' }
+          : { state: 'absent' }
+      }
+    }
+
     const day: DayRecord = {
       date: today,
       logged: true,
@@ -115,6 +160,7 @@ export default function Today() {
       impactDomains: domains.length > 0 ? domains : undefined,
       symptoms,
       medications: meds.map((label) => ({ medicationId: label.toLowerCase(), label })),
+      note: narrative.trim() || undefined,
       depth: 'standard',
     }
     upsertDay(day)
@@ -283,6 +329,91 @@ export default function Today() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+        </Field>
+
+        {/* Free-text narrative */}
+        <Field
+          label="Or describe today in your own words"
+          hint="Optional. Write however you'd naturally describe it — the app looks for symptom mentions and lets you confirm what it found before anything is saved."
+        >
+          <textarea
+            value={narrative}
+            onChange={(e) => setNarrative(e.target.value)}
+            placeholder="e.g. My periods have been extremely painful lately. I also feel exhausted and sometimes get stomach pain when I use the bathroom."
+            rows={3}
+            className="focus-ring w-full rounded-xl px-3.5 py-3 text-[14px] leading-relaxed"
+            style={{ border: '1px solid var(--hairline-strong)', background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical' }}
+          />
+
+          {extraction && (
+            <div className="mt-3 rounded-xl p-3.5" style={{ background: 'var(--surface-sunken)' }}>
+              {extraction.matches.length === 0 ? (
+                <p className="text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+                  No symptom mentions recognised yet — nothing will be added from this text.
+                </p>
+              ) : (
+                <>
+                  <p className="mb-2.5 text-[12px] font-medium uppercase tracking-wide" style={{ color: 'var(--ink-muted)' }}>
+                    Detected — review before saving
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {extraction.matches.map((m) => {
+                      const def = getSymptom(m.symptomId)
+                      const included = narrativeIncluded[m.symptomId] ?? true
+                      const graded = def?.graded !== false
+                      const severity = narrativeSeverity[m.symptomId] ?? m.severity ?? 5
+                      return (
+                        <div
+                          key={m.symptomId}
+                          className="flex flex-wrap items-center gap-2.5 rounded-lg px-3 py-2"
+                          style={{ background: 'var(--surface)', opacity: included ? 1 : 0.5 }}
+                        >
+                          <button
+                            className="chip focus-ring"
+                            data-selected={included}
+                            onClick={() => setNarrativeIncluded((s) => ({ ...s, [m.symptomId]: !included }))}
+                          >
+                            {included ? '✓' : '+'} {symptomLabel(m.symptomId, customLabels)}
+                            {!m.present && ' — denied'}
+                          </button>
+                          {m.present && graded && (
+                            <>
+                              <input
+                                type="range"
+                                min={0}
+                                max={10}
+                                value={severity}
+                                disabled={!included}
+                                onChange={(e) =>
+                                  setNarrativeSeverity((s) => ({ ...s, [m.symptomId]: Number(e.target.value) }))
+                                }
+                                className="focus-ring h-1.5 w-24"
+                                style={{ accentColor: 'var(--ink)' }}
+                                aria-label={`Severity for ${symptomLabel(m.symptomId, customLabels)}`}
+                              />
+                              <span className="tnum text-[12.5px]" style={{ color: 'var(--ink-secondary)' }}>
+                                {severity}
+                                {m.severityInferred && '*'}
+                              </span>
+                            </>
+                          )}
+                          <span className="text-[11.5px] italic" style={{ color: 'var(--ink-muted)' }}>
+                            "{m.sourceText}"
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="mt-2.5 text-[11.5px]" style={{ color: 'var(--ink-muted)' }}>
+                    * severity not stated in the text — estimated at a neutral default, edit the slider if it's wrong.
+                    {extraction.menstrualContext && ' Menstrual context detected.'}
+                    {extraction.recentOnset && ' Reads as a recent change.'}
+                    {extraction.durationText && ` Duration mentioned: "${extraction.durationText}".`}
+                  </p>
+                </>
+              )}
             </div>
           )}
         </Field>
