@@ -16,6 +16,29 @@ npm run dev     # the prototype
 
 ---
 
+## Response to Review 2
+
+Review 2 raised two points directly. Both are addressed with substance rather than a
+promise, and both are pointed to here so they don't have to be re-found in the room:
+
+1. **"Read more about endometriosis and the research gaps."** `docs/COMPETITIVE_ANALYSIS.md` §1
+   now grounds the project in two systematic/scoping reviews of diagnostic delay, five
+   patient-reported-outcome studies (ENDOPAIN-4D, the Endometriosis Symptom Diary and
+   Impact Scale, and two PRO-domain reviews), two 2025 reviews of the existing
+   symptom-tracker app landscape, and the closest scientific precedent, Phendo/Citizen
+   Endo — twelve sources total, listed at the foot of that document. The gap those
+   reviews converge on — trackers exist, but few produce output *designed for a
+   clinical consultation* rather than the user's own dashboard — is the specific gap
+   this project targets, stated in `PRD.md` §1 and re-derived independently by the
+   literature rather than asserted first and justified after.
+2. **"How will you tackle privacy and ethical data concerns?"** Answered in full in
+   `docs/PRIVACY.md`: what is true now (no real data is ever collected — see §4 there
+   for exactly how the synthetic data is generated), what is deferred and in what
+   order, and the specific harms — reproductive/sexual-health data, a population
+   already experiencing diagnostic dismissal — that ordering is designed against.
+
+---
+
 # Part A — Technical Accuracy
 
 ## A1. Architecture: where computation is allowed to happen

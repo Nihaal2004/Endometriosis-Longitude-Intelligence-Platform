@@ -55,6 +55,7 @@ Three properties do the work:
 | [`BUILDLOG.md`](BUILDLOG.md) | Methods and their rationale, full evaluation results with interpretation, and the defects found and fixed |
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements, data model, acceptance criteria |
 | [`docs/COMPETITIVE_ANALYSIS.md`](docs/COMPETITIVE_ANALYSIS.md) | Methodology compared against Flo, Clue, Phendo, Bearable and Guava, with the divergences measured |
+| [`docs/PRIVACY.md`](docs/PRIVACY.md) | Privacy and ethics position: what's true now, what's deferred and why, how the demo data is generated |
 
 ## Headline results
 
