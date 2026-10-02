@@ -50,6 +50,9 @@ Three properties do the work:
 
 ## Documentation
 
+The local database foundation is described in [SQLite database design](docs/SQLITE_DESIGN.md),
+with setup instructions in [backend/README.md](backend/README.md).
+
 | Document | Contents |
 |---|---|
 | [`BUILDLOG.md`](BUILDLOG.md) | Methods and their rationale, full evaluation results with interpretation, and the defects found and fixed |
