@@ -37,7 +37,7 @@ const GATE_COPY: Record<GateReason, string> = {
 }
 
 export default function Patterns() {
-  const { ctx, patterns } = useAnalysis()
+  const { ctx, patterns, verifiedClaims } = useAnalysis()
   const customLabels = useCustomLabels()
   const [openId, setOpenId] = useState<string | null>(null)
 
@@ -112,7 +112,7 @@ export default function Patterns() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 style={{ fontSize: 28 }}>Patterns</h1>
+          <h1 style={{ fontSize: 28 }}>Your insights</h1>
           <p className="mt-1 text-[13.5px]" style={{ color: 'var(--ink-secondary)' }}>
             {ctx.loggedDays} of {ctx.calendarDays} days logged ·{' '}
             {ctx.windowCycles.filter((c) => c.complete).length} complete cycles in this window ·{' '}
@@ -124,7 +124,9 @@ export default function Patterns() {
           {pct(ctx.coverage)}% coverage
         </div>
       </header>
+      {ctx.loggedDays === 0 && <div className="card p-5"><h2>Start with your first check-in</h2><p>No observations are saved yet. The system will show descriptive counts first and withhold patterns until enough evidence is available.</p></div>}
 
+      {ctx.loggedDays > 0 && <section className="card p-6"><span className="eyebrow">YOUR SUMMARY</span><h2>A clearer account of your observations</h2><p className="muted">Computed locally from your recorded answers. Missing observations remain unknown.</p>{verifiedClaims.filter(c=>['findings','impact','change'].includes(c.section)).slice(0,6).map(c=><p className="mt-3" key={c.id}>{c.text}</p>)}{verifiedClaims.filter(c=>['findings','impact','change'].includes(c.section)).length===0&&<p className="mt-3">There is not yet enough evidence for longitudinal conclusions. The counts below describe the observations you have entered.</p>}</section>}
       {/* ---------------- Phase heatmap ---------------- */}
       <section className="card p-5">
         <h2 style={{ fontSize: 18 }}>Symptoms by cycle day</h2>

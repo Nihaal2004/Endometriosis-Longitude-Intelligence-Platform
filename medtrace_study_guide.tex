@@ -1,0 +1,1207 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+\usepackage{array}
+\usepackage{longtable}
+
+\definecolor{Ink}{HTML}{23313A}
+\definecolor{Blue}{HTML}{1E5F7A}
+\definecolor{Teal}{HTML}{1E9A8A}
+\definecolor{Coral}{HTML}{C95C55}
+\definecolor{Sand}{HTML}{F4EEE6}
+\definecolor{Soft}{HTML}{EAF5F3}
+\definecolor{Gold}{HTML}{D99A23}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=Blue,
+  urlcolor=Blue,
+  citecolor=Blue
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{MedTrace Technical Study Guide}
+\rhead{Design and Implementation}
+\cfoot{\thepage}
+
+\titleformat{\section}{\Large\bfseries\color{Blue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{Ink}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{Teal}}{\thesubsubsection}{0.6em}{}
+
+\setlist[itemize]{leftmargin=1.2em}
+\setlist[enumerate]{leftmargin=1.4em}
+\renewcommand{\arraystretch}{1.2}
+
+\newtcolorbox{designbox}{
+  colback=Soft,
+  colframe=Blue,
+  arc=2mm,
+  boxrule=0.7pt,
+  left=2mm,
+  right=2mm,
+  top=1mm,
+  bottom=1mm
+}
+
+\newtcolorbox{implbox}{
+  colback=Sand,
+  colframe=Teal,
+  arc=2mm,
+  boxrule=0.7pt,
+  left=2mm,
+  right=2mm,
+  top=1mm,
+  bottom=1mm
+}
+
+\newtcolorbox{futurebox}{
+  colback=white,
+  colframe=Coral,
+  arc=2mm,
+  boxrule=0.7pt,
+  left=2mm,
+  right=2mm,
+  top=1mm,
+  bottom=1mm
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Huge\bfseries\color{Blue} MedTrace\par}
+  \vspace{0.4cm}
+  {\Large Endometriosis Longitudinal Intelligence Platform\par}
+  \vspace{1.2cm}
+  {\Large\bfseries Design, Current Implementation, Evaluation and Future Work\par}
+  \vspace{0.5cm}
+  {\large Technical Study Guide\par}
+  \vfill
+  \begin{designbox}
+    \centering
+    This document explains the full system design, the current implemented prototype, the evaluation approach, and the remaining work required for a complete production-ready platform.
+  \end{designbox}
+  \vfill
+  {\large \today\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{System Overview}
+
+MedTrace is designed as a longitudinal health-intelligence system for endometriosis-related symptom tracking. The central idea is that the patient should not have to behave like a researcher by filling out long daily forms, but the system should still be able to build a clinically useful longitudinal record over time.
+
+The product converts small daily interactions into structured observations. Those observations are then transformed into derived features, statistically tested patterns, evidence objects and a clinician-facing summary.
+
+\subsection{Core product objective}
+
+\begin{designbox}
+\textbf{Objective:} Capture low-burden patient-reported symptoms over time and convert them into structured, evidence-traceable clinical context.
+\end{designbox}
+
+The system is deliberately not framed as a diagnostic tool. It does not diagnose endometriosis, stage disease, assign a probability of disease or replace clinical judgement. Its goal is to make longitudinal patient history more visible and usable during a consultation.
+
+\subsection{Why longitudinal intelligence is needed}
+
+Endometriosis-related symptoms may involve pelvic pain, menstrual pain, bowel symptoms, urinary symptoms, fatigue, medication use, treatment response and functional impact. These symptoms often make sense only when seen across time:
+
+\begin{itemize}
+  \item across menstrual cycles,
+  \item before and after treatment,
+  \item during flare episodes,
+  \item around investigations or consultations,
+  \item as persistent non-cyclical symptoms.
+\end{itemize}
+
+A short consultation often receives this information as memory-based narration. MedTrace instead aims to produce a structured summary generated from the record itself.
+
+\section{Target Design}
+
+\subsection{Target product flow}
+
+The complete platform is designed around the following flow:
+
+\begin{enumerate}
+  \item Low-burden daily capture.
+  \item Structured longitudinal record.
+  \item Deterministic feature calculation.
+  \item Pattern detection and evidence creation.
+  \item Optional AI-assisted explanation or intake.
+  \item Fidelity and safety checking.
+  \item Patient review.
+  \item Selective clinician sharing.
+\end{enumerate}
+
+The most important architectural rule is that clinical calculations should not be performed by a language model. Calculations should be deterministic and auditable. AI can assist with language or data entry only after structured evidence exists.
+
+\subsection{Target architecture layers}
+
+\begin{longtable}{>{\bfseries}p{0.24\linewidth}p{0.68\linewidth}}
+\toprule
+Layer & Target responsibility \\
+\midrule
+Patient interface & Daily check-in, event logging, medication input, personal home screen and report preview. \\
+Local secure store & Offline-first encrypted storage so entries are not lost when internet is unavailable. \\
+Backend API & Account-linked synchronization, validation, report persistence and sharing workflow. \\
+Structured event database & Stores symptoms, bleeding, impact, medication, treatment and healthcare events as append-only observations. \\
+Analytics engine & Computes cycles, features, patterns, baselines, treatment comparisons and evidence objects. \\
+AI support layer & Converts voice/text to candidate structured entries and optionally rewrites explanations without changing numbers. \\
+Safety and fidelity layer & Prevents unsupported clinical claims, verifies numbers and ensures diagnostic overstatement is avoided. \\
+Sharing layer & Allows the patient to preview, approve and share only selected report sections. \\
+Audit and consent layer & Records consent, report generation, access and sharing actions. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Target data entities}
+
+The complete production design includes the following entities:
+
+\begin{itemize}
+  \item PatientProfile
+  \item SymptomDefinition
+  \item PatientSymptom
+  \item SymptomEvent
+  \item BleedingEvent
+  \item ImpactEvent
+  \item MedicationEvent
+  \item TreatmentEpisode
+  \item ClinicalEvent
+  \item Cycle
+  \item DerivedFeature
+  \item Finding
+  \item Report
+  \item ReportClaim
+  \item Consent
+  \item ShareGrant
+  \item AuditEvent
+\end{itemize}
+
+The current prototype implements many of these conceptually inside TypeScript data structures, but does not yet implement the production database, accounts, consent objects, sharing grants or audit trail.
+
+\section{Design Principles}
+
+\subsection{Rich model, low daily burden}
+
+The complete model can support many symptom types and contextual fields, but the user should normally see only a few questions. This is achieved through:
+
+\begin{itemize}
+  \item adaptive symptom shortcuts,
+  \item conditional follow-up questions,
+  \item optional sensitive modules,
+  \item event-based detailed logging,
+  \item cycle-aware prioritization,
+  \item patient-specific baseline learning.
+\end{itemize}
+
+\subsection{Missing data is not zero}
+
+The system uses a tri-state symptom model:
+
+\begin{center}
+\texttt{present} \quad | \quad \texttt{absent} \quad | \quad \texttt{unknown}
+\end{center}
+
+If a day is not logged, or a symptom is not asked, that symptom is unknown. It is not counted as absent.
+
+\begin{designbox}
+\textbf{Design impact:} Unknown observations are excluded from denominators. This protects symptom rates from being distorted by gaps in tracking.
+\end{designbox}
+
+\subsection{Cycle-aware, not cycle-predictive}
+
+MedTrace uses menstrual bleeding as a temporal anchor, but it does not predict future cycles. The current cycle engine segments cycles from recorded bleeding and aligns symptoms relative to observed onset days.
+
+This is important because the analytical goal is retrospective evidence generation. A predictor would tend to smooth irregular cycles, while MedTrace needs to preserve individual variation.
+
+\subsection{Patient safety and control}
+
+The full design includes patient review before sharing. Sensitive modules such as sexual health and fertility should be optional. Notifications should be generic and privacy-preserving. Clinicians should not receive permanent unrestricted access by default.
+
+\subsection{Evidence traceability}
+
+Every major clinician-facing claim should be traceable to:
+
+\begin{itemize}
+  \item raw day records,
+  \item derived features,
+  \item statistical finding,
+  \item evidence dates,
+  \item claim text.
+\end{itemize}
+
+\section{Current Implementation Architecture}
+
+\subsection{Technology stack}
+
+The current prototype uses:
+
+\begin{itemize}
+  \item React for UI,
+  \item TypeScript for type-safe data and engine logic,
+  \item Vite for development/build tooling,
+  \item Zustand for local application state,
+  \item React Router for navigation,
+  \item SVG-based custom charts,
+  \item Vitest for tests,
+  \item synthetic data generation for demo and evaluation.
+\end{itemize}
+
+\subsection{Current runtime flow}
+
+When the app runs, the flow is:
+
+\begin{enumerate}
+  \item The selected demo persona provides a base PatientRecord.
+  \item Session edits from the Today screen are layered onto the record.
+  \item The app chooses a default analysis window.
+  \item The feature engine builds a FeatureContext.
+  \item The pattern engine runs all detectors.
+  \item The brief generator creates claims from passed findings.
+  \item The fidelity checker verifies claim values.
+  \item UI screens render analysis outputs.
+\end{enumerate}
+
+\subsection{Important source modules}
+
+\begin{longtable}{>{\ttfamily}p{0.36\linewidth}p{0.58\linewidth}}
+\toprule
+File & Responsibility \\
+\midrule
+src/App.tsx & App shell, navigation, theme toggle and persona switcher. \\
+src/main.tsx & React root and hash router setup. \\
+src/ui/store.ts & App state, record assembly and analysis orchestration. \\
+src/ui/screens/Today.tsx & Daily adaptive check-in UI. \\
+src/ui/screens/Patterns.tsx & Pattern visualizations and suppressed finding display. \\
+src/ui/screens/Timeline.tsx & Longitudinal symptom and healthcare event timeline. \\
+src/ui/screens/Brief.tsx & Clinician summary and evidence drawer. \\
+src/ui/screens/Validation.tsx & Validation metrics display. \\
+src/engine/types.ts & Central data model. \\
+src/engine/cycles.ts & Cycle segmentation and phase alignment. \\
+src/engine/features.ts & Derived feature computation. \\
+src/engine/patterns.ts & Pattern detection, multiple testing and gates. \\
+src/engine/baseline.ts & Personal baseline change detection. \\
+src/engine/brief.ts & Deterministic claim generation. \\
+src/engine/fidelity.ts & Independent claim verification. \\
+src/engine/adaptive.ts & Adaptive question planning. \\
+src/data/personas.ts & Demo persona definitions. \\
+src/data/generator.ts & Synthetic patient generation. \\
+src/eval/harness.ts & Evaluation experiments. \\
+\bottomrule
+\end{longtable}
+
+\section{Implemented Data Model}
+
+\subsection{Patient profile}
+
+The PatientProfile stores baseline information such as:
+
+\begin{itemize}
+  \item patient ID,
+  \item display name,
+  \item age range,
+  \item diagnosis status,
+  \item symptom onset year,
+  \item family history,
+  \item previous pelvic surgery,
+  \item previous diagnostic labels,
+  \item cycle regularity,
+  \item enabled symptom domains.
+\end{itemize}
+
+The model intentionally avoids unnecessary identity fields such as exact address or government ID because the intelligence layer does not need them.
+
+\subsection{DayRecord}
+
+Each DayRecord represents one calendar day. It contains:
+
+\begin{itemize}
+  \item date,
+  \item logged flag,
+  \item bleeding level,
+  \item impact level,
+  \item impact domains,
+  \item symptom observations,
+  \item medications,
+  \item note,
+  \item logging depth.
+\end{itemize}
+
+If logged is false, the day contributes no symptom observations to denominators.
+
+\subsection{SymptomObservation}
+
+A SymptomObservation contains:
+
+\begin{itemize}
+  \item state: present, absent or unknown,
+  \item optional severity when present and graded.
+\end{itemize}
+
+This separation is important because some symptoms are graded, while others are event-like or binary.
+
+\subsection{TreatmentEpisode}
+
+Treatment episodes represent longer-term interventions. The current model supports:
+
+\begin{itemize}
+  \item treatment ID,
+  \item treatment kind,
+  \item label,
+  \item start date,
+  \item optional end date,
+  \item dose,
+  \item reason,
+  \item indication symptom,
+  \item side effects,
+  \item patient perceived change.
+\end{itemize}
+
+The pattern engine uses treatment episodes to compare before and during treatment periods.
+
+\subsection{ClinicalEvent}
+
+Clinical events include GP visits, gynecology visits, emergency visits, investigations, surgery, diagnosis and admissions. Each event has date, type, label, reason, outcome and note fields.
+
+\section{Implemented Symptom Vocabulary}
+
+The prototype includes a multi-domain symptom vocabulary:
+
+\begin{itemize}
+  \item pain symptoms,
+  \item bowel symptoms,
+  \item urinary symptoms,
+  \item systemic symptoms,
+  \item sexual symptoms,
+  \item rare or extrapelvic symptoms.
+\end{itemize}
+
+Each symptom definition includes:
+
+\begin{itemize}
+  \item ID,
+  \item patient-facing label,
+  \item optional clinical term,
+  \item domain,
+  \item whether it is graded,
+  \item whether it is rare,
+  \item whether it is sensitive.
+\end{itemize}
+
+\subsection{Patient label and clinical term}
+
+The system supports different labels for patient-facing and clinician-facing language. For example, the patient may see ``Pain opening bowels'', while the clinician brief may use ``Dyschezia''.
+
+\subsection{Current custom labels}
+
+The current implementation demonstrates custom vocabulary through persona-specific labels. Full patient-created symptom flows are future work.
+
+\section{Implemented Adaptive Check-In}
+
+\subsection{Purpose}
+
+The adaptive check-in is designed to reduce daily burden while keeping the full symptom vocabulary accessible.
+
+\subsection{Inputs to the adaptive planner}
+
+The planner uses:
+
+\begin{itemize}
+  \item symptom frequency,
+  \item last present date,
+  \item observed days since last present,
+  \item cycle phase,
+  \item menstrual-window rate ratio,
+  \item sensitive symptom rules,
+  \item pinned symptoms.
+\end{itemize}
+
+\subsection{Planner outputs}
+
+The planner outputs:
+
+\begin{itemize}
+  \item surfaced symptom chips,
+  \item dormant symptoms,
+  \item field count,
+  \item static field count comparator,
+  \item current cycle day.
+\end{itemize}
+
+\subsection{Dormancy}
+
+Symptoms that have not been reported for many observed days can be moved out of the daily visible list. This does not remove them from the app. It only de-prioritizes them.
+
+\subsection{Cycle-phase surfacing}
+
+If a symptom appears more often during the menstrual window, it can receive a score boost during that phase. This lets the app ask more relevant questions at the right time.
+
+\section{Implemented Cycle Engine}
+
+\subsection{Cycle segmentation}
+
+The cycle engine detects menstrual onsets from bleeding records. Flow levels include light, moderate, heavy and very heavy. Spotting does not start a new cycle. This prevents false cycle boundaries.
+
+\subsection{Minimum cycle gap}
+
+A minimum cycle gap prevents two close bleeding runs from being treated as separate cycles. This is deliberately permissive so irregular cycles can still be represented without over-segmentation.
+
+\subsection{Complete vs incomplete cycles}
+
+The trailing cycle is marked incomplete because the next onset has not been observed. Incomplete cycles do not contribute to calculations that require known cycle length.
+
+\subsection{Signed cycle day}
+
+The engine expresses days relative to the nearest onset:
+
+\begin{itemize}
+  \item D0 is bleeding onset.
+  \item D+1 is one day after onset.
+  \item D-2 is two days before the next onset.
+\end{itemize}
+
+\subsection{Phase angle}
+
+For complete cycles, the engine maps each day to a circular phase angle. This supports circular tests such as Rayleigh testing.
+
+\section{Implemented Feature Engine}
+
+\subsection{FeatureContext}
+
+The FeatureContext is the central derived object passed to pattern detection. It contains:
+
+\begin{itemize}
+  \item patient record,
+  \item analysis window,
+  \item cycle configuration,
+  \item all cycles,
+  \item cycles inside the window,
+  \item aligned days,
+  \item days by date,
+  \item ordered dates,
+  \item calendar days,
+  \item logged days,
+  \item coverage,
+  \item per-symptom features.
+\end{itemize}
+
+\subsection{Per-symptom features}
+
+For each symptom, the feature engine computes:
+
+\begin{itemize}
+  \item observed days,
+  \item days present,
+  \item severe days,
+  \item median severity,
+  \item maximum severity,
+  \item menstrual-window rate,
+  \item non-menstrual rate,
+  \item cycles with symptom,
+  \item cycles observed,
+  \item impact days,
+  \item medication days,
+  \item coverage,
+  \item per-cycle rates.
+\end{itemize}
+
+\subsection{Unknown handling in features}
+
+The feature engine skips unknown observations before incrementing denominators. This is the implementation of the missing-data design rule.
+
+\section{Implemented Pattern Engine}
+
+\subsection{Pattern detectors}
+
+The implemented pattern engine includes detectors for:
+
+\begin{itemize}
+  \item cyclicity,
+  \item persistence,
+  \item trend,
+  \item co-occurrence,
+  \item functional burden,
+  \item treatment response,
+  \item baseline change.
+\end{itemize}
+
+\subsection{Cyclicity detector}
+
+The cyclicity detector asks whether a symptom is concentrated around menstruation. It uses:
+
+\begin{itemize}
+  \item Fisher's exact test on menstrual-window vs non-menstrual observations,
+  \item risk ratio as effect size,
+  \item confidence interval,
+  \item Rayleigh test as a circular cross-check,
+  \item evidence dates where the symptom was present.
+\end{itemize}
+
+\subsection{Persistence detector}
+
+Persistence checks whether a symptom is present outside the menstrual window. This is descriptive and uses non-menstrual occurrence rate with a confidence interval.
+
+\subsection{Trend detector}
+
+Trend detection uses per-cycle occurrence rates. It applies Mann--Kendall and Theil--Sen slope to identify monotonic change over cycles.
+
+\subsection{Co-occurrence detector}
+
+Co-occurrence detects whether two symptoms appear together more than expected. It uses Cohen's kappa and a permutation null. It only uses days where both symptoms were observed.
+
+\subsection{Functional burden detector}
+
+Functional burden summarizes days where symptoms affected normal activity. This separates life impact from symptom severity.
+
+\subsection{Treatment response detector}
+
+Treatment response compares symptom rates before and during a treatment episode. The wording is descriptive and avoids claiming causality.
+
+\subsection{Baseline change detector}
+
+Baseline change compares the latest complete cycle to prior cycles. This supports the ``patient compared with herself'' design principle.
+
+\subsection{Multiplicity correction}
+
+The engine uses Benjamini--Hochberg correction within pattern families. This reduces false discoveries when multiple symptoms and pattern types are tested.
+
+\subsection{Evidence gate}
+
+The evidence gate suppresses findings when:
+
+\begin{itemize}
+  \item coverage is too low,
+  \item observed days are too few,
+  \item complete cycles are too few,
+  \item event counts are too low,
+  \item significance after correction is not reached.
+\end{itemize}
+
+Suppressed findings are still returned so the UI can show why they were not reported.
+
+\section{Implemented Brief Generation}
+
+\subsection{Purpose of the brief}
+
+The brief is the clinician-facing output. It is designed to be short, structured and traceable.
+
+\subsection{Brief sections}
+
+The implemented brief contains:
+
+\begin{itemize}
+  \item recorded period,
+  \item cycle summary,
+  \item main concerns,
+  \item longitudinal findings,
+  \item functional impact,
+  \item medication and treatment,
+  \item clinical timeline,
+  \item data quality,
+  \item fixed non-diagnostic statement.
+\end{itemize}
+
+\subsection{Claim object}
+
+Each sentence is represented as a Claim with:
+
+\begin{itemize}
+  \item claim ID,
+  \item finding ID,
+  \item section,
+  \item text,
+  \item asserted values,
+  \item evidence dates,
+  \item verification status.
+\end{itemize}
+
+\subsection{Why templating is used}
+
+Templating ensures that numbers in the brief come directly from computed findings. This prevents uncontrolled text generation from inventing values.
+
+\subsection{Finding ranking}
+
+Findings are ranked by clinical salience so the brief remains concise. Cyclicity and baseline/treatment changes are prioritized above less central patterns.
+
+\section{Implemented Fidelity Verification}
+
+\subsection{Reason for a separate checker}
+
+If the checker reused the same computed feature objects, it would not truly verify anything. Therefore, the fidelity module re-derives key values from raw records through a separate implementation path.
+
+\subsection{What is verified}
+
+The checker verifies key counts and rates that appear in claim text. It also checks that evidence dates are real logged days.
+
+\subsection{What happens on mismatch}
+
+If a claim fails verification, it is rejected and not shown in the verified claim list.
+
+\subsection{Optional LLM polish safety}
+
+The code includes a numeric-token gate for possible future rewritten prose. A polished sentence may change wording, but numeric tokens must already exist in the original claim.
+
+\section{Implemented UI Design}
+
+\subsection{Today}
+
+The Today screen demonstrates:
+
+\begin{itemize}
+  \item cycle ring,
+  \item coverage display,
+  \item bleeding selector,
+  \item pelvic pain slider,
+  \item adaptive symptom chips,
+  \item add-another symptom flow,
+  \item impact question,
+  \item medication chips,
+  \item dormant symptom explanation.
+\end{itemize}
+
+\subsection{Patterns}
+
+The Patterns screen demonstrates:
+
+\begin{itemize}
+  \item symptom-by-cycle-day heatmap,
+  \item cyclical findings,
+  \item persistent symptoms,
+  \item trends and changes,
+  \item treatment-related findings,
+  \item co-occurrence matrix,
+  \item withheld findings with reasons.
+\end{itemize}
+
+\subsection{Timeline}
+
+The Timeline screen demonstrates:
+
+\begin{itemize}
+  \item daily burden ribbon,
+  \item bleeding overlay,
+  \item treatment bands,
+  \item healthcare event markers,
+  \item treatment episode cards,
+  \item clinical event history,
+  \item cycle summary cards.
+\end{itemize}
+
+\subsection{Brief}
+
+The Brief screen demonstrates:
+
+\begin{itemize}
+  \item report-style layout,
+  \item patient context,
+  \item recorded period,
+  \item main concerns,
+  \item findings sections,
+  \item clinical timeline,
+  \item data quality statement,
+  \item safety statement,
+  \item evidence drawer for claims.
+\end{itemize}
+
+\subsection{Validation}
+
+The Validation screen renders metrics from the evaluation output. It connects the prototype to measurable engine behavior.
+
+\section{Synthetic Data Design}
+
+\subsection{Why synthetic data is used}
+
+The prototype uses synthetic data because real health data requires consent, privacy controls, storage security and potentially ethics approval. Synthetic data allows the engine to be tested safely.
+
+\subsection{Generator behavior}
+
+The generator creates:
+
+\begin{itemize}
+  \item menstrual cycles,
+  \item bleeding levels,
+  \item true symptom states,
+  \item symptom severities,
+  \item missingness,
+  \item adaptive questioning effects,
+  \item impact levels,
+  \item medication use,
+  \item treatment changes.
+\end{itemize}
+
+\subsection{Ground truth}
+
+Generated records include ground-truth labels for evaluation. The pattern engine does not read these labels. They are used only to score whether the engine detects known patterns.
+
+\section{Evaluation Design}
+
+\subsection{Purpose of evaluation}
+
+The current evaluation measures computational behavior, not clinical outcomes. It checks whether the engine detects known synthetic patterns, avoids false patterns, handles missing data, verifies brief claims and reduces logging burden.
+
+\subsection{Detection experiment}
+
+The detection experiment generates synthetic patients with known cyclical and non-cyclical symptoms. It compares:
+
+\begin{itemize}
+  \item MedTrace full engine,
+  \item descriptive ratio rule,
+  \item missing-as-zero baseline.
+\end{itemize}
+
+\subsection{Power sweep}
+
+The power sweep varies the concentration of cyclical symptoms around menstruation. It tests whether detection improves as patterns become stronger.
+
+\subsection{Robustness sweep}
+
+The robustness sweep varies missingness rates and missingness types:
+
+\begin{itemize}
+  \item MCAR: missing completely at random,
+  \item MAR: missingness related to symptom burden.
+\end{itemize}
+
+\subsection{Fidelity experiment}
+
+The fidelity experiment generates briefs and verifies claims. It also mutates claim numbers to test whether the checker catches corrupted values.
+
+\subsection{Burden experiment}
+
+The burden experiment compares adaptive field count against fixed-questionnaire alternatives.
+
+\subsection{Latency experiment}
+
+The latency experiment measures runtime for feature extraction, pattern detection, brief generation and fidelity verification.
+
+\section{Current Evaluation Results}
+
+\subsection{Automated tests}
+
+The project reports 111 automated tests. These cover:
+
+\begin{itemize}
+  \item statistical reference values,
+  \item cycle segmentation,
+  \item phase alignment,
+  \item missing-data behavior,
+  \item engine determinism,
+  \item evidence-date attachment,
+  \item brief generation,
+  \item diagnostic-language safety,
+  \item fidelity verification.
+\end{itemize}
+
+\subsection{Cyclicity detection}
+
+\begin{tabularx}{\linewidth}{>{\bfseries}p{0.34\linewidth}cccc}
+\toprule
+Classifier & Precision & Recall & F1 & False patterns \\
+\midrule
+MedTrace full engine & 0.977 & 0.649 & 0.780 & 2 \\
+Ratio rule baseline & 0.856 & 0.908 & 0.881 & 20 \\
+Missing-as-zero baseline & 0.850 & 0.908 & 0.878 & 21 \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Interpretation}
+
+The baseline ratio rule finds more true patterns, but it also produces more false patterns. MedTrace is deliberately more conservative because its output is clinician-facing. The goal is not to maximize every possible detection; it is to produce findings that are sufficiently supported.
+
+\subsection{Brief fidelity}
+
+\begin{tabularx}{\linewidth}{>{\bfseries}p{0.40\linewidth}p{0.18\linewidth}X}
+\toprule
+Metric & Result & Meaning \\
+\midrule
+Claims verified & 226 / 226 & Correct generated claims passed verification. \\
+Injected mutations caught & 194 / 194 & Corrupted numeric claims were rejected. \\
+Verified key coverage & 59.5\% & Many displayed values were independently re-derived. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Logging burden}
+
+\begin{tabularx}{\linewidth}{>{\bfseries}p{0.42\linewidth}ccc}
+\toprule
+Comparator & Fields/day & Reduction & Est. time \\
+\midrule
+Adaptive planner & 6.8 & -- & 24s \\
+Fixed own-vocabulary questionnaire & 9.0 & 24.1\% & 32s \\
+Fixed full-vocabulary questionnaire & 37.0 & 81.5\% & 130s \\
+\bottomrule
+\end{tabularx}
+
+\section{Current Scope Completion}
+
+\subsection{Implemented core}
+
+The current implementation includes:
+
+\begin{itemize}
+  \item adaptive daily check-in,
+  \item structured patient record,
+  \item demo persona generation,
+  \item cycle segmentation,
+  \item feature extraction,
+  \item statistical pattern engine,
+  \item evidence gate,
+  \item timeline view,
+  \item clinician brief,
+  \item evidence drawer,
+  \item fidelity verification,
+  \item evaluation harness,
+  \item metrics screen,
+  \item automated tests,
+  \item documentation.
+\end{itemize}
+
+\subsection{Not yet production complete}
+
+The following are intentionally future work:
+
+\begin{itemize}
+  \item authentication,
+  \item encrypted local storage,
+  \item backend database,
+  \item server synchronization,
+  \item consent records,
+  \item report sharing grants,
+  \item audit logs,
+  \item mobile app packaging,
+  \item patient-defined symptom creation UI,
+  \item voice/text AI intake,
+  \item real-world pilot evaluation.
+\end{itemize}
+
+\section{Future Work: Full Design}
+
+This section describes the remaining work in detail.
+
+\subsection{1. Production onboarding}
+
+The current app starts directly with demo personas. The complete app should include privacy-first onboarding:
+
+\begin{itemize}
+  \item account creation,
+  \item consent explanation,
+  \item baseline profile setup,
+  \item initial symptom selection,
+  \item module preferences,
+  \item medication list setup,
+  \item reminder preferences.
+\end{itemize}
+
+Onboarding should avoid collecting unnecessary identity data. The health-intelligence engine needs symptom context, not exact identity details.
+
+\subsection{2. Patient-defined symptom system}
+
+The full design should allow the patient to create custom symptoms. For example, a patient might enter ``sharp pain down my left thigh''. The system should store both:
+
+\begin{itemize}
+  \item patient wording,
+  \item standardized internal mapping.
+\end{itemize}
+
+Future implementation should include:
+
+\begin{itemize}
+  \item custom symptom creation screen,
+  \item symptom domain classification,
+  \item graded/binary configuration,
+  \item clinical label mapping,
+  \item patient edit/delete controls,
+  \item support in adaptive planner,
+  \item support in brief labels.
+\end{itemize}
+
+\subsection{3. Three logging depths}
+
+The current implementation mainly demonstrates a standard daily entry. The full app should explicitly support:
+
+\begin{itemize}
+  \item Quick check-in,
+  \item Standard entry,
+  \item Detailed episode.
+\end{itemize}
+
+Quick check-in should capture continuity. Standard entry should capture normal daily data. Detailed episode should capture location, character, duration, triggers, medication response and affected activities when something significant happens.
+
+\subsection{4. Event-based detailed logging}
+
+Instead of asking detailed questions daily, the system should open detailed forms only when relevant:
+
+\begin{itemize}
+  \item sudden severe pain,
+  \item unusual bleeding,
+  \item emergency visit,
+  \item new medication,
+  \item treatment change,
+  \item investigation result,
+  \item major functional disruption.
+\end{itemize}
+
+This keeps daily burden low while still collecting rich information around clinically meaningful events.
+
+\subsection{5. AI-assisted conversational intake}
+
+Future AI intake should allow the patient to enter natural language such as:
+
+\begin{quote}
+Had bad cramps this morning, around 8 out of 10. Loose stools and could not attend college. Took ibuprofen and felt better by lunch.
+\end{quote}
+
+The intake agent should extract candidate structured fields:
+
+\begin{itemize}
+  \item pelvic pain present,
+  \item severity 8,
+  \item timing morning,
+  \item diarrhoea present,
+  \item functional impact education,
+  \item medication ibuprofen,
+  \item response improved.
+\end{itemize}
+
+The patient must confirm before saving. AI should assist data entry, not autonomously modify the record.
+
+\subsection{6. Secure local storage}
+
+The current prototype stores state locally for demo purposes. The full app should use encrypted local storage:
+
+\begin{itemize}
+  \item encrypted SQLite on mobile,
+  \item iOS Keychain / Android Keystore for secrets,
+  \item local-first writes,
+  \item secure deletion,
+  \item device lock integration.
+\end{itemize}
+
+\subsection{7. Offline-first synchronization}
+
+Daily logging should work without internet. The target flow:
+
+\begin{enumerate}
+  \item Entry is saved locally immediately.
+  \item Entry is queued for sync.
+  \item Backend receives validated event.
+  \item Server acknowledges.
+  \item Conflicts are resolved deterministically.
+\end{enumerate}
+
+This is important because losing health entries would reduce trust and data quality.
+
+\subsection{8. Backend architecture}
+
+The target backend can use:
+
+\begin{itemize}
+  \item FastAPI for API endpoints,
+  \item Pydantic for schema validation,
+  \item SQLAlchemy for ORM,
+  \item PostgreSQL for persistent relational data,
+  \item S3/KMS for documents,
+  \item async workers for report generation,
+  \item OpenTelemetry for monitoring.
+\end{itemize}
+
+The backend should validate all incoming events and never trust client-only calculations for shared reports.
+
+\subsection{9. Identity and health-data separation}
+
+The target architecture should logically separate:
+
+\begin{itemize}
+  \item identity account data,
+  \item health observations.
+\end{itemize}
+
+The health system should use a pseudonymous patient ID. This reduces unnecessary exposure of identity in the analytics layer.
+
+\subsection{10. Consent and selective sharing}
+
+The complete system should allow the patient to choose what is shared:
+
+\begin{itemize}
+  \item pain history,
+  \item cycle patterns,
+  \item treatments,
+  \item investigations,
+  \item bowel symptoms,
+  \item urinary symptoms,
+  \item sexual-health information,
+  \item fertility information,
+  \item private notes.
+\end{itemize}
+
+Sharing should create a Report and ShareGrant rather than giving permanent account access. Grants should support expiration and revocation.
+
+\subsection{11. Audit trail}
+
+Production implementation should store AuditEvent records for:
+
+\begin{itemize}
+  \item login,
+  \item report generation,
+  \item report preview,
+  \item share creation,
+  \item share access,
+  \item share revocation,
+  \item data export,
+  \item deletion request.
+\end{itemize}
+
+\subsection{12. Report versioning}
+
+Reports should be immutable snapshots. If the underlying record changes, a new report version should be generated rather than silently changing an already shared report.
+
+Each report should store:
+
+\begin{itemize}
+  \item generated timestamp,
+  \item analysis window,
+  \item claim list,
+  \item evidence references,
+  \item data coverage,
+  \item selected sharing sections,
+  \item safety statement,
+  \item report version.
+\end{itemize}
+
+\subsection{13. Safety layer}
+
+The full platform should enforce:
+
+\begin{itemize}
+  \item no diagnosis language,
+  \item no risk score,
+  \item no disease staging from symptoms,
+  \item no unsupported causal claims,
+  \item treatment-response caveats,
+  \item data-quality notices,
+  \item emergency/safety messaging for red-flag symptoms.
+\end{itemize}
+
+\subsection{14. Clinical document support}
+
+Future event records can include document attachments such as:
+
+\begin{itemize}
+  \item ultrasound report,
+  \item MRI report,
+  \item laparoscopy note,
+  \item discharge summary,
+  \item prescription,
+  \item referral letter.
+\end{itemize}
+
+Documents should be stored securely, with metadata extracted separately from file storage.
+
+\subsection{15. Real-world validation}
+
+After production features are implemented, the system should be evaluated through:
+
+\begin{itemize}
+  \item usability testing,
+  \item patient feedback,
+  \item clinician feedback,
+  \item report readability assessment,
+  \item logging adherence study,
+  \item safety review,
+  \item comparison with manual diary summaries.
+\end{itemize}
+
+\section{Future Work Roadmap}
+
+\subsection{Phase 1: Product completion}
+
+\begin{itemize}
+  \item Onboarding and baseline profile.
+  \item Module preference settings.
+  \item Patient-defined symptoms.
+  \item Three logging depths.
+  \item Event-based detailed forms.
+\end{itemize}
+
+\subsection{Phase 2: Security and persistence}
+
+\begin{itemize}
+  \item Encrypted local database.
+  \item Authentication.
+  \item Backend schema.
+  \item Sync engine.
+  \item Data export and deletion.
+\end{itemize}
+
+\subsection{Phase 3: Sharing and reporting}
+
+\begin{itemize}
+  \item Report snapshots.
+  \item Patient preview controls.
+  \item Section-level sharing.
+  \item Share grants.
+  \item Audit trail.
+\end{itemize}
+
+\subsection{Phase 4: AI assistance}
+
+\begin{itemize}
+  \item Conversational intake.
+  \item Candidate extraction.
+  \item Patient confirmation.
+  \item Optional prose polish with numeric guard.
+  \item Safety review.
+\end{itemize}
+
+\subsection{Phase 5: Pilot validation}
+
+\begin{itemize}
+  \item Recruit test users under appropriate approval.
+  \item Collect usability feedback.
+  \item Collect clinician feedback on report usefulness.
+  \item Refine adaptive planner and brief format.
+  \item Measure retention and completion time.
+\end{itemize}
+
+\section{Design Tradeoffs}
+
+\subsection{Precision over recall}
+
+The engine is conservative. It may miss some true patterns, but it reduces unsupported findings. This is appropriate because the output is clinician-facing.
+
+\subsection{Templated brief over free-generation}
+
+Templating is less flexible than free-form AI, but it is safer and easier to verify.
+
+\subsection{Synthetic validation before clinical data}
+
+Synthetic data does not prove clinical utility, but it allows safe engineering validation before real-world deployment.
+
+\subsection{Local prototype before backend}
+
+Building the analytics core first validates the central product idea before adding production infrastructure.
+
+\section{Final Technical Summary}
+
+\begin{implbox}
+The current implementation proves the core concept: low-burden daily symptom records can be transformed into structured longitudinal features, statistically gated findings and an evidence-traceable clinician brief. The prototype contains a working UI, data model, feature engine, pattern engine, fidelity checker, validation harness and demo personas.
+\end{implbox}
+
+\begin{futurebox}
+The full product requires production infrastructure: secure accounts, encrypted storage, offline sync, backend validation, patient-defined symptoms, AI-assisted intake, consent, report sharing, audit logging and real-world validation. These additions extend the current core rather than replacing it.
+\end{futurebox}
+
+\end{document}

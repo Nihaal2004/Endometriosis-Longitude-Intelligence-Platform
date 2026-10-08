@@ -3,14 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Longitudinal symptom intelligence prototype for endometriosis",
+  "description": "Local patient symptom history and clinical visit workspace",
   "scripts": {
+    "api": "npm run build && backend\\.venv\\Scripts\\python.exe backend/server.py",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval": "tsx src/eval/run-eval.ts"
+    "eval": "tsx src/eval/run-eval.ts",
+    "start": "npm run api"
   },
   "dependencies": {
     "framer-motion": "^11.15.0",

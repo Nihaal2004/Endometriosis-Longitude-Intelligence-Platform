@@ -1,4 +1,8 @@
-# Methodology, fine-tuned against existing apps
+# Historical research comparison
+
+This comparison preserves the original project research and synthetic engine
+evaluation. Competitor descriptions have not been reverified for this release.
+For current implemented features, see [PRD.md](PRD.md).
 
 **Purpose.** This document exists to answer one question a reviewer will reasonably ask: *symptom trackers already exist, so what is actually different here?* Every difference claimed below is a difference we implemented and, where possible, measured — not a positioning statement.
 

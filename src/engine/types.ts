@@ -66,6 +66,7 @@ export type SymptomDomain =
   | 'extrapelvic'
 
 export interface SymptomDefinition {
+  archived?: boolean
   id: string
   label: string
   /** Clinical term surfaced in the clinician brief, where it differs from the patient label. */
@@ -106,6 +107,7 @@ export interface DayRecord {
   symptoms: Record<string, SymptomObservation>
   medications?: MedicationEntry[]
   note?: string
+  episode?: { location?: string; character?: string; timing?: string; durationMinutes?: number; trigger?: string; response?: string }
   /** Which of the three logging depths produced this record. */
   depth?: 'quick' | 'standard' | 'detailed'
 }
@@ -199,6 +201,8 @@ export interface ClinicalEvent {
 }
 
 export interface PatientProfile {
+  onboarded?: boolean
+  reminderTime?: string
   id: string
   displayName: string
   ageRange?: string
@@ -215,6 +219,8 @@ export interface PatientProfile {
 }
 
 export interface PatientRecord {
+  customSymptoms?: (SymptomDefinition & { mappedTo?: string })[]
+  medicationList?: MedicationEntry[]
   profile: PatientProfile
   days: DayRecord[]
   treatments: TreatmentEpisode[]

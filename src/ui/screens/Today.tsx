@@ -1,418 +1,109 @@
-/**
- * Today — the daily check-in.
- *
- * The whole product argument lives on this screen: a data model of 100+ fields, and
- * the patient sees four or five. Two things are shown here that a consumer tracker
- * does not show, both deliberate:
- *
- *   - Which questions were *skipped* and why. Question reduction that happens
- *     invisibly reads as the app forgetting; shown, it reads as the app learning.
- *   - That a skipped question is recorded as unknown, not as "no". This is the single
- *     most consequential difference between this record and a calendar-cell tracker,
- *     so it is stated on the screen where it happens.
- */
-
 import { useMemo, useState } from 'react'
-import { CycleRing, type RingDay } from '../charts'
-import { useAnalysis, useApp, useCustomLabels, useRecord } from '../store'
+import { Link } from 'react-router-dom'
+import { useApp, useCustomLabels, useRecord, localDate } from '../store'
 import { planDailyQuestions, explainDormancy } from '../../engine/adaptive'
-import { symptomLabel, getSymptom, SYMPTOMS } from '../../engine/symptoms'
-import { BLEEDING_LEVELS, ImpactLevel, IMPACT_LABELS, type BleedingLevel, type DayRecord, type SymptomObservation } from '../../engine/types'
-import { addDays } from '../../engine/cycles'
-
-const IMPACT_DOMAINS = ['Work', 'Education', 'Exercise', 'Sleep', 'Household', 'Social', 'Concentration', 'Mood']
-
-const BLEED_LABEL: Record<BleedingLevel, string> = {
-  none: 'None',
-  spotting: 'Spotting',
-  light: 'Light',
-  moderate: 'Moderate',
-  heavy: 'Heavy',
-  very_heavy: 'Very heavy',
-}
+import { BLEEDING_LEVELS, IMPACT_LABELS, type BleedingLevel, type DayRecord, type ImpactLevel, type SymptomObservation } from '../../engine/types'
+import { buildFeatureContext, defaultWindow } from '../../engine/features'
+import { symptomDefinitions } from '../records'
+import AssistedEntry from '../AssistedEntry'
+import ConfirmRemove from '../ConfirmRemove'
 
 export default function Today() {
   const record = useRecord()
-  const { ctx } = useAnalysis()
-  const upsertDay = useApp((s) => s.upsertDay)
-  const customLabels = useCustomLabels()
-
-  const today = ctx.orderedDates[ctx.orderedDates.length - 1] ?? record.days[record.days.length - 1]?.date
-  const existing = ctx.daysByDate.get(today)
-
-  const plan = useMemo(() => planDailyQuestions(ctx, today), [ctx, today])
-
-  const [bleeding, setBleeding] = useState<BleedingLevel>(existing?.bleeding ?? 'none')
-  const [pain, setPain] = useState<number>(existing?.symptoms['pelvic_pain']?.severity ?? 0)
-  const [impact, setImpact] = useState<ImpactLevel | null>(existing?.impact ?? null)
-  const [domains, setDomains] = useState<string[]>(existing?.impactDomains ?? [])
-  const [extra, setExtra] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {}
-    for (const q of plan.surfaced) {
-      init[q.symptomId] = existing?.symptoms[q.symptomId]?.state === 'present'
-    }
-    return init
-  })
-  const [meds, setMeds] = useState<string[]>(existing?.medications?.map((m) => m.label) ?? [])
-  const [showMore, setShowMore] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  const ringDays: RingDay[] = useMemo(() => {
-    const currentCycle = ctx.cycles[ctx.cycles.length - 1]
-    if (!currentCycle) return []
-
-    // The current cycle is still running, so its recorded "length" is only the days
-    // elapsed so far. Drawing the ring at that length would make five days into a
-    // cycle look like a completed one. Size the ring to this patient's typical cycle
-    // instead, and draw the not-yet-lived remainder as empty track.
-    const complete = ctx.cycles.filter((c) => c.complete).map((c) => c.lengthDays)
-    const typical = complete.length
-      ? Math.round(complete.reduce((s, v) => s + v, 0) / complete.length)
-      : 28
-    const elapsed = currentCycle.lengthDays
-    const ringLength = Math.max(elapsed, typical)
-
-    const out: RingDay[] = []
-    for (let i = 0; i < ringLength; i++) {
-      const date = addDays(currentCycle.startDate, i)
-      const day = ctx.daysByDate.get(date)
-      const aligned = ctx.aligned.get(date)
-      out.push({
-        date,
-        bleedLevel: day?.bleeding ? BLEEDING_LEVELS.indexOf(day.bleeding) : 0,
-        logged: Boolean(day?.logged),
-        isToday: date === today,
-        signedCycleDay: aligned?.signedCycleDay ?? i,
-        future: i >= elapsed,
-      })
-    }
-    return out
-  }, [ctx, today])
-
-  const cycleDay = plan.cycleDay
-
-  function save() {
-    const symptoms: Record<string, SymptomObservation> = {}
-    // Only questions that were actually asked get a state. Everything else stays
-    // absent from the record and is therefore `unknown` — never a manufactured "no".
-    symptoms['pelvic_pain'] = pain > 0 ? { state: 'present', severity: pain } : { state: 'absent' }
-    for (const q of plan.surfaced) {
-      if (q.symptomId === 'pelvic_pain') continue
-      const on = extra[q.symptomId]
-      const graded = getSymptom(q.symptomId)?.graded !== false
-      symptoms[q.symptomId] = on
-        ? graded
-          ? { state: 'present', severity: Math.max(3, pain || 5) }
-          : { state: 'present' }
-        : { state: 'absent' }
-    }
-
-    const day: DayRecord = {
-      date: today,
-      logged: true,
-      bleeding,
-      impact: impact ?? ImpactLevel.None,
-      impactDomains: domains.length > 0 ? domains : undefined,
-      symptoms,
-      medications: meds.map((label) => ({ medicationId: label.toLowerCase(), label })),
-      depth: 'standard',
-    }
-    upsertDay(day)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2600)
-  }
-
-  const moreSymptoms = SYMPTOMS.filter(
-    (s) => !plan.surfaced.some((q) => q.symptomId === s.id) && s.id !== 'pelvic_pain',
-  )
-
-  return (
-    <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
-      {/* ---------------- Cycle ring ---------------- */}
-      <section className="card flex flex-col items-center p-5">
-        <CycleRing
-          days={ringDays}
-          size={240}
-          centre={
-            <>
-              <div className="text-[11px] font-medium uppercase tracking-widest" style={{ color: 'var(--ink-muted)' }}>
-                {cycleDay ? 'Cycle day' : 'Tracking'}
-              </div>
-              <div className="display" style={{ fontSize: 44, lineHeight: 1.05, marginTop: 2 }}>
-                {cycleDay
-                  ? cycleDay.signedCycleDay >= 0
-                    ? `D${cycleDay.signedCycleDay}`
-                    : `D${cycleDay.signedCycleDay}`
-                  : '—'}
-              </div>
-              <div className="mt-1 text-[12.5px]" style={{ color: 'var(--ink-secondary)' }}>
-                {cycleDay?.inMenstrualWindow ? 'Perimenstrual window' : 'Outside period window'}
-              </div>
-            </>
-          }
-        />
-        <div className="mt-3 text-center text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
-          {today}
-        </div>
-        <div className="mt-4 w-full rounded-xl p-3 text-[12px] leading-relaxed"
-          style={{ background: 'var(--surface-sunken)', color: 'var(--ink-secondary)' }}>
-          Dashes on the ring are days with no entry. They stay unknown — the analysis never
-          reads them as symptom-free. The pale outer track is the rest of a typical cycle,
-          not a prediction of when the next period will start.
-        </div>
-
-        <dl className="mt-4 w-full space-y-2">
-          {[
-            ['Days logged', `${ctx.loggedDays} of ${ctx.calendarDays}`],
-            ['Coverage', `${Math.round(ctx.coverage * 100)}%`],
-            ['Cycles in window', String(ctx.windowCycles.filter((c) => c.complete).length)],
-          ].map(([k, v]) => (
-            <div key={k} className="flex items-baseline justify-between text-[12.5px]">
-              <dt style={{ color: 'var(--ink-muted)' }}>{k}</dt>
-              <dd className="tnum" style={{ color: 'var(--ink)' }}>{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {/* ---------------- Check-in ---------------- */}
-      <section className="card p-5 sm:p-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 style={{ fontSize: 26 }}>Today</h1>
-          <span className="text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
-            {plan.fieldCount} questions · about {Math.round(plan.fieldCount * 3.5)} seconds
-          </span>
-        </div>
-
-        {/* Bleeding */}
-        <Field label="Bleeding">
-          <div className="flex flex-wrap gap-2">
-            {BLEEDING_LEVELS.map((lvl) => (
-              <button
-                key={lvl}
-                className="chip focus-ring"
-                data-selected={bleeding === lvl}
-                onClick={() => setBleeding(lvl)}
-              >
-                {lvl !== 'none' && (
-                  <span
-                    aria-hidden
-                    style={{
-                      width: 9, height: 9, borderRadius: 999, flexShrink: 0,
-                      background: `color-mix(in srgb, var(--bleed) ${20 + BLEEDING_LEVELS.indexOf(lvl) * 18}%, transparent)`,
-                      border: '1px solid var(--bleed)',
-                    }}
-                  />
-                )}
-                {BLEED_LABEL[lvl]}
-              </button>
-            ))}
-          </div>
-        </Field>
-
-        {/* Pain */}
-        <Field label="Pelvic pain">
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min={0}
-              max={10}
-              value={pain}
-              onChange={(e) => setPain(Number(e.target.value))}
-              className="focus-ring h-2 flex-1"
-              style={{ accentColor: 'var(--ink)' }}
-              aria-label="Pelvic pain severity, 0 to 10"
-            />
-            <span className="display tnum" style={{ fontSize: 30, minWidth: 42, textAlign: 'right' }}>
-              {pain}
-            </span>
-          </div>
-        </Field>
-
-        {/* Adaptive chips */}
-        <Field
-          label="Anything else today?"
-          hint={
-            plan.surfaced.some((q) => q.reason === 'cycle_phase')
-              ? 'Some of these are surfaced because your period window is a time they usually appear.'
-              : undefined
-          }
-        >
-          <div className="flex flex-wrap gap-2">
-            {plan.surfaced
-              .filter((q) => q.symptomId !== 'pelvic_pain')
-              .map((q) => (
-                <button
-                  key={q.symptomId}
-                  className="chip focus-ring"
-                  data-selected={Boolean(extra[q.symptomId])}
-                  onClick={() => setExtra((s) => ({ ...s, [q.symptomId]: !s[q.symptomId] }))}
-                >
-                  {symptomLabel(q.symptomId, customLabels)}
-                  {q.reason === 'cycle_phase' && (
-                    <span aria-hidden style={{ width: 5, height: 5, borderRadius: 999, background: 'var(--bleed)' }} />
-                  )}
-                </button>
-              ))}
-            <button
-              className="chip focus-ring"
-              onClick={() => setShowMore((v) => !v)}
-              style={{ borderStyle: 'dashed' }}
-            >
-              {showMore ? 'Close' : '+ Add another'}
-            </button>
-          </div>
-
-          {showMore && (
-            <div className="mt-3 max-h-56 overflow-y-auto rounded-xl p-3"
-              style={{ background: 'var(--surface-sunken)' }}>
-              <p className="mb-2 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-                The full vocabulary stays available at all times — nothing is ever removed, only
-                de-prioritised.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {moreSymptoms.map((s) => (
-                  <button
-                    key={s.id}
-                    className="chip focus-ring"
-                    style={{ minHeight: 34, fontSize: 13 }}
-                    data-selected={Boolean(extra[s.id])}
-                    onClick={() => setExtra((v) => ({ ...v, [s.id]: !v[s.id] }))}
-                  >
-                    {symptomLabel(s.id, customLabels)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </Field>
-
-        {/* Impact */}
-        <Field label="Did symptoms interfere with your day?">
-          <div className="flex flex-col gap-2">
-            {([0, 1, 2, 3] as ImpactLevel[]).map((lvl) => (
-              <button
-                key={lvl}
-                onClick={() => setImpact(lvl)}
-                className="focus-ring flex items-center gap-3 rounded-xl px-4 py-3 text-left text-[14px] transition-colors"
-                style={{
-                  border: `1px solid ${impact === lvl ? 'var(--ink)' : 'var(--hairline-strong)'}`,
-                  background: impact === lvl ? 'var(--surface-sunken)' : 'transparent',
-                  color: 'var(--ink)',
-                }}
-                aria-pressed={impact === lvl}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    width: 16, height: 16, borderRadius: 999, flexShrink: 0,
-                    border: `2px solid ${impact === lvl ? 'var(--ink)' : 'var(--hairline-strong)'}`,
-                    background: impact === lvl ? 'var(--ink)' : 'transparent',
-                  }}
-                />
-                {IMPACT_LABELS[lvl]}
-              </button>
-            ))}
-          </div>
-
-          {/* Conditional follow-up: only when something was actually affected */}
-          {impact !== null && impact >= ImpactLevel.ModifiedActivities && (
-            <div className="mt-3 rounded-xl p-3" style={{ background: 'var(--amber-soft)' }}>
-              <p className="mb-2 text-[13px] font-medium" style={{ color: 'var(--ink)' }}>
-                What was affected?
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {IMPACT_DOMAINS.map((d) => (
-                  <button
-                    key={d}
-                    className="chip focus-ring"
-                    style={{ minHeight: 34, fontSize: 13 }}
-                    data-selected={domains.includes(d.toLowerCase())}
-                    onClick={() =>
-                      setDomains((s) =>
-                        s.includes(d.toLowerCase())
-                          ? s.filter((x) => x !== d.toLowerCase())
-                          : [...s, d.toLowerCase()],
-                      )
-                    }
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </Field>
-
-        {/* Medication */}
-        <Field label="Medication">
-          <div className="flex flex-wrap gap-2">
-            {['Ibuprofen', 'Paracetamol', 'Mefenamic acid', 'Codeine'].map((m) => (
-              <button
-                key={m}
-                className="chip focus-ring"
-                data-selected={meds.includes(m)}
-                onClick={() => setMeds((s) => (s.includes(m) ? s.filter((x) => x !== m) : [...s, m]))}
-              >
-                {m}
-              </button>
-            ))}
-            <button className="chip focus-ring" data-selected={meds.length === 0} onClick={() => setMeds([])}>
-              None
-            </button>
-          </div>
-        </Field>
-
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <button
-            onClick={save}
-            className="focus-ring rounded-full px-6 py-3 text-[15px] font-semibold"
-            style={{ background: 'var(--ink)', color: 'var(--ground)', border: 'none' }}
-          >
-            Save today
-          </button>
-          {saved && (
-            <span className="text-[13px]" style={{ color: 'var(--sage)' }}>
-              Saved — the Patterns and Brief screens have recalculated.
-            </span>
-          )}
-        </div>
-
-        {/* Dormancy explanation */}
-        {plan.dormant.length > 0 && (
-          <div className="mt-6 rounded-xl p-4" style={{ background: 'var(--surface-sunken)' }}>
-            <p className="text-[13px] font-medium" style={{ color: 'var(--ink)' }}>
-              Not asked today ({plan.dormant.length})
-            </p>
-            <ul className="mt-1.5 space-y-1">
-              {plan.dormant.slice(0, 4).map((d) => (
-                <li key={d.symptomId} className="text-[12.5px]" style={{ color: 'var(--ink-secondary)' }}>
-                  {explainDormancy(d)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
-              These days are stored as <em>unknown</em> for those symptoms — not as “no”.
-            </p>
-          </div>
-        )}
-      </section>
-    </div>
-  )
+  const date = useApp(s => s.selectedDate)
+  const revision = useApp(s => s.revision)
+  return <CheckIn key={`${record.profile.id}:${date}:${revision}`} />
 }
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="mt-6">
-      <label className="mb-2.5 block text-[14px] font-semibold" style={{ color: 'var(--ink)' }}>
-        {label}
-      </label>
-      {hint && (
-        <p className="mb-2 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
-          {hint}
-        </p>
-      )}
-      {children}
-    </div>
-  )
+function CheckIn() {
+  const record = useRecord()
+  const analysisAllowed = useApp(s => s.consents.health_analysis)
+  const windowDays = useApp(s => s.windowDays)
+  const ctx = useMemo(() => analysisAllowed ? buildFeatureContext(record, defaultWindow(record, windowDays)) : null, [record, windowDays, analysisAllowed])
+  const date = useApp(s => s.selectedDate)
+  const busy = useApp(s => s.busy)
+  const labels = useCustomLabels()
+  const existing = record.days.find(d => d.date === date)
+  const plan = useMemo(() => ctx ? planDailyQuestions(ctx, date,
+    record.trackedSymptomIds.filter(id => symptomDefinitions(record).some(s=>s.id===id && s.sensitive && record.profile.enabledDomains.includes(s.domain)))) : {cycleDay:null,dormant:[],surfaced:record.trackedSymptomIds.slice(0,4).map(symptomId=>({symptomId}))}, [ctx, date, record])
+  const [depth, setDepth] = useState<NonNullable<DayRecord['depth']>>(existing?.depth ?? 'standard')
+  const [bleeding, setBleeding] = useState<BleedingLevel | ''>(existing?.bleeding ?? '')
+  const [impact, setImpact] = useState<ImpactLevel | ''>(existing?.impact ?? '')
+  const [symptoms, setSymptoms] = useState<Record<string, SymptomObservation>>(existing?.symptoms ?? {})
+  const [meds, setMeds] = useState(existing?.medications ?? [])
+  const [medsKnown, setMedsKnown] = useState(existing?.medications !== undefined)
+  const [medName, setMedName] = useState('')
+  const [medDose, setMedDose] = useState('')
+  const [note, setNote] = useState(existing?.note ?? '')
+  const [domains, setDomains] = useState(existing?.impactDomains ?? [])
+  const [showMore, setShowMore] = useState(false)
+  const [location, setLocation] = useState(existing?.episode?.location ?? '')
+  const [duration, setDuration] = useState(existing?.episode?.durationMinutes?.toString() ?? '')
+  const [trigger, setTrigger] = useState(existing?.episode?.trigger ?? '')
+  const [character, setCharacter] = useState(existing?.episode?.character ?? '')
+  const [timing, setTiming] = useState(existing?.episode?.timing ?? '')
+  const [response, setResponse] = useState(existing?.episode?.response ?? '')
+  const surfaced = plan.surfaced.filter(q => record.trackedSymptomIds.includes(q.symptomId))
+  const visibleIds = new Set(['pelvic_pain', ...(depth === 'quick' ? surfaced.slice(0, 1) : surfaced).map(q => q.symptomId), ...Object.keys(symptoms).filter(id => symptoms[id].state !== 'unknown')])
+  const allowed = symptomDefinitions(record).filter(s => record.profile.enabledDomains.includes(s.domain) && (!s.archived || existing?.symptoms[s.id]))
+  const visible = allowed.filter(s => showMore || visibleIds.has(s.id))
+  const update = (id: string, observation: SymptomObservation) => setSymptoms(s => ({ ...s, [id]: observation }))
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    const medications = [...meds, ...(medName.trim() ? [{ medicationId: crypto.randomUUID(), label: medName.trim(), dose: medDose || undefined }] : [])]
+    const day: DayRecord = { date, logged: true, depth, symptoms,
+      bleeding: bleeding || undefined, impact: impact === '' ? undefined : impact,
+      impactDomains: impact !== '' && impact >= 2 ? domains : undefined,
+      medications: medications.length > 0 || medsKnown ? medications : undefined, note: note || undefined,
+      episode: depth === 'detailed' ? { location, character, timing, durationMinutes: duration ? Number(duration) : undefined, trigger, response } : existing?.episode }
+    try { await useApp.getState().upsertDay(day) } catch { return }
+  }
+  return <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
+    <aside className="card p-5 space-y-4"><h2>Your record</h2>
+      <p>{plan.cycleDay ? `Cycle day ${plan.cycleDay.signedCycleDay} · ${plan.cycleDay.inMenstrualWindow ? 'Perimenstrual window' : 'Outside period window'}` : 'Cycle phase is not established for this date.'}</p>
+      {ctx && <p>{ctx.loggedDays} logged days · {Math.round(ctx.coverage * 100)}% coverage</p>}
+      {ctx && <p>{ctx.windowCycles.filter(c => c.complete).length} complete cycles in the analysis window</p>}
+      <p>Unanswered questions remain unknown. Select “Absent” only when you actually observed no symptom.</p>
+      {analysisAllowed && <><Link to="/patterns">View insights →</Link><br /><Link to="/brief">Prepare clinical visit →</Link></>}
+      <h3>Recent entries</h3>
+      {[...record.days].slice(-10).reverse().map(d => <button disabled={busy} className="mvp-row w-full" key={d.date} onClick={() => useApp.getState().setDate(d.date)}>{d.date} · {d.depth ?? 'standard'}</button>)}
+      {record.days.length === 0 && <p>Your first entry starts the record. Patterns need more observations over time.</p>}
+    </aside>
+    <form className="card mvp-form p-6" onSubmit={save}><h1>Daily check-in</h1>
+      <fieldset disabled={busy} className="mvp-lock">
+      <div className="mvp-grid"><label>Entry date<input type="date" required max={localDate()} value={date} onChange={e => { if (e.target.value) useApp.getState().setDate(e.target.value) }} /></label>
+        <label>Check-in depth<select value={depth} onChange={e => setDepth(e.target.value as typeof depth)}><option value="quick">Quick</option><option value="standard">Standard</option><option value="detailed">Detailed episode</option></select></label></div>
+      <p>{existing ? 'Editing a saved entry. Existing answers are preserved until you change them.' : 'New entry. Leave questions unanswered if you do not know.'}</p>
+      <label>Bleeding<select value={bleeding} onChange={e => setBleeding(e.target.value as BleedingLevel | '')}><option value="">Unknown / unanswered</option>{BLEEDING_LEVELS.map(v => <option key={v} value={v}>{v.replaceAll('_', ' ')}</option>)}</select></label>
+      <AssistedEntry record={record} confirm={answers=>setSymptoms(s=>({...s,...answers}))}/>
+      <fieldset><legend>Symptoms</legend>
+        {visible.map(s => <div className="mvp-symptom" key={s.id}>
+          <label>{labels[s.id] ?? s.label}<select aria-label={`${s.label} observation`} disabled={!!s.archived} value={symptoms[s.id]?.state ?? 'unknown'} onChange={e => update(s.id, { state: e.target.value as SymptomObservation['state'] })}>
+            <option value="unknown">Unknown / unanswered</option><option value="absent">Absent</option><option value="present">Present</option>
+          </select></label>
+          {s.graded && symptoms[s.id]?.state === 'present' && <label>Severity (optional)<select aria-label={`${s.label} severity`} disabled={!!s.archived} value={symptoms[s.id]?.severity ?? ''} onChange={e => update(s.id, { state: 'present', severity: e.target.value ? Number(e.target.value) : undefined })}><option value="">Not rated</option>{Array.from({ length: 10 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}/10</option>)}</select></label>}
+        </div>)}
+        <button type="button" onClick={() => setShowMore(v => !v)}>{showMore ? 'Show adaptive questions' : '+ Add another symptom'}</button>
+      </fieldset>
+      <label>Did symptoms interfere with your day?<select value={impact} onChange={e => setImpact(e.target.value === '' ? '' : Number(e.target.value) as ImpactLevel)}><option value="">Unknown / unanswered</option>{([0, 1, 2, 3] as ImpactLevel[]).map(n => <option value={n} key={n}>{IMPACT_LABELS[n]}</option>)}</select></label>
+      {impact !== '' && impact >= 2 && <fieldset><legend>Activities affected</legend><div className="flex flex-wrap gap-3">{['work', 'education', 'exercise', 'sleep', 'household', 'social', 'concentration', 'mood'].map(v => <label className="mvp-inline" key={v}><input type="checkbox" checked={domains.includes(v)} onChange={e => setDomains(s => e.target.checked ? [...s, v] : s.filter(d => d !== v))} />{v}</label>)}</div></fieldset>}
+      {depth !== 'quick' && <fieldset><legend>Medication taken</legend>
+        <label className="mvp-inline"><input type="checkbox" checked={medsKnown} onChange={e => setMedsKnown(e.target.checked)} />Medication answer confirmed (empty list means none taken)</label>
+        {meds.map((m, i) => <div key={i} className="mvp-row"><span>{m.label} {m.dose}</span><button type="button" onClick={() => setMeds(s => s.filter((_, n) => n !== i))}>Remove</button></div>)}
+        <div className="flex flex-wrap gap-2">{record.medicationList?.map(m => <button type="button" key={m.medicationId} onClick={() => { setMeds(items => [...items, {...m}]); setMedsKnown(true) }}>+ {m.label}</button>)}</div><div className="mvp-grid"><label>Medication name<input maxLength={200} value={medName} onChange={e => setMedName(e.target.value)} placeholder="e.g. Ibuprofen" /></label><label>Dose / schedule<input maxLength={200} value={medDose} onChange={e => setMedDose(e.target.value)} placeholder="Optional" /></label></div>
+        <button type="button" disabled={!medName.trim()} onClick={() => { setMeds(s => [...s, { medicationId: crypto.randomUUID(), label: medName.trim(), dose: medDose || undefined }]); setMedName(''); setMedDose('') }}>Add medication</button>
+        {depth === 'detailed' && meds.map((m, i) => <label key={m.medicationId}>Relief after {m.label} (optional)<select value={m.perceivedRelief ?? ''} onChange={e => setMeds(items => items.map((item, n) => n === i ? { ...item, perceivedRelief: e.target.value === '' ? undefined : Number(e.target.value) } : item))}><option value="">Not rated</option>{Array.from({ length: 11 }, (_, n) => <option value={n} key={n}>{n}/10</option>)}</select></label>)}
+      </fieldset>}
+      {depth === 'detailed' && <fieldset><legend>Episode detail</legend><div className="mvp-grid">
+        <label>Pain location<input value={location} onChange={e => setLocation(e.target.value)} /></label><label>Duration in minutes<input type="number" min="1" max="1440" value={duration} onChange={e => setDuration(e.target.value)} /></label>
+        <label>Pain character<input maxLength={500} value={character} onChange={e => setCharacter(e.target.value)} placeholder="e.g. aching, sharp, cramping" /></label><label>Timing<input maxLength={500} value={timing} onChange={e => setTiming(e.target.value)} placeholder="e.g. intermittent, morning" /></label><label>Trigger<input value={trigger} onChange={e => setTrigger(e.target.value)} /></label><label>What helped / response<input value={response} onChange={e => setResponse(e.target.value)} /></label>
+      </div></fieldset>}
+      {depth !== 'quick' && <label>Daily note<textarea maxLength={3000} value={note} onChange={e => setNote(e.target.value)} /></label>}
+      <p className="muted">If you feel seriously unwell or believe your symptoms need urgent attention, seek clinical help. This check-in does not assess emergencies.</p>
+      <button className="mvp-primary" disabled={busy}>{busy ? 'Saving to database…' : existing ? 'Save changes' : 'Save check-in'}</button>
+      {existing && <p role="status">This date has a saved entry. Save changes to update your record.</p>}
+      {existing && <ConfirmRemove label="entry" remove={() => useApp.getState().saveRecord({ ...record, days: record.days.filter(d => d.date !== date) })} />}
+      {plan.dormant.length > 0 && <details><summary>Why some questions were skipped</summary>{plan.dormant.filter(d => allowed.some(s => s.id === d.symptomId)).map(d => <p key={d.symptomId}>{explainDormancy(d)}</p>)}</details>}
+      </fieldset>
+    </form>
+  </div>
 }

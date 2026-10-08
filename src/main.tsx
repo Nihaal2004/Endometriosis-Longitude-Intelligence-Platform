@@ -6,8 +6,8 @@ import './ui/styles.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {/* HashRouter so the prototype works from a static file open, not just a server. */}
-    <HashRouter>
+    {/* HashRouter avoids route rewrites; serve through Vite for the local API proxy. */}
+    <HashRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
       <App />
     </HashRouter>
   </StrictMode>,

@@ -103,7 +103,7 @@ export function planDailyQuestions(
     const f = ctx.features.get(symptomId)
     if (!f) continue
 
-    const def = getSymptom(symptomId)
+    const def = getSymptom(symptomId) ?? ctx.record.customSymptoms?.find(s => s.id === symptomId)
     // Sensitive modules are opt-in and never surfaced automatically.
     if (def?.sensitive && !pinned.includes(symptomId)) continue
 

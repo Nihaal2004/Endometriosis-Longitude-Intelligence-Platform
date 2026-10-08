@@ -9,3 +9,8 @@ __pycache__/
 *.sqlite3-*
 *.db
 .vite/
+.env
+.env.*
+!.env.example
+backend/data/
+*.tsbuildinfo

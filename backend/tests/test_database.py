@@ -81,7 +81,7 @@ def test_retry_conflict_and_revision_history(setup_db):
     assert db.save_day(subject, changed, expected_revision=1, request_id=str(uuid4())) == 2
     assert db.read_days(subject, '2026-10-02', '2026-10-02')[0]['entry'] == changed
     assert db.connection.execute('SELECT COUNT(*) FROM day_revisions WHERE patient_id=?',
-                                 (patient,)).fetchone()[0] == 2
+                                 (patient,)).fetchone()[0] == 3
 
 
 def test_patient_isolation(setup_db):
@@ -132,7 +132,7 @@ def test_migration_version_and_future_schema(tmp_path):
     vault = Vault({1: AESGCM.generate_key(bit_length=256)}, 1)
     path = tmp_path / 'migration.sqlite3'
     db = Database(path, vault)
-    assert db.connection.execute('PRAGMA user_version').fetchone()[0] == 1
+    assert db.connection.execute('PRAGMA user_version').fetchone()[0] == 3
     db.connection.execute('PRAGMA user_version=99')
     db.close()
     with pytest.raises(RuntimeError):

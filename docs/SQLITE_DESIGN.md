@@ -1,304 +1,110 @@
-# SQLite database design
+# SQLite database design — schema v3
 
-Status: implemented foundation, schema version 1. This document describes the code
-in `backend/medtrace_db/database.py` and `backend/medtrace_db/crypto.py`. Future
-entities are listed separately; this is not the complete production schema.
+The local application uses `backend/data/medtrace.sqlite3`. Migrations and repository
+operations are defined in `backend/medtrace_db/database.py`; encryption envelopes
+are implemented in `crypto.py`. See [architecture](ARCHITECTURE.md) for HTTP/auth.
 
-## Architecture and responsibility
+## Tables
 
-The application runs locally. Python's standard `sqlite3` driver reads and writes
-the database file; no PostgreSQL service, S3 bucket, or ORM is required for this
-foundation. The database layer owns persistence, payload encryption, consent
-checks, patient scoping, and daily-entry revisions.
-
-The authentication teammate owns Supabase login, JWT verification, sessions, and
-refresh tokens. Every repository operation receives the verified JWT `sub`, which
-must be a UUID. The repository normalizes it and resolves a local patient UUID.
-It does not verify JWTs itself: UUID validation is not authentication. The API must
-never take this subject from a client-selected request field.
-
-```mermaid
-flowchart LR
-    UI[React interface] --> Auth[Local API and Supabase authentication integration]
-    Auth -->|Verified subject| Repo[SQLite repository]
-    Repo -->|Encrypt and decrypt payloads| Vault[AES-GCM vault]
-    Keys[Windows Credential Manager] --> Vault
-    Repo --> DB[(Local SQLite file)]
-    Repo -->|Analysis consent checked| Engine[Existing TypeScript engine integration — pending]
-```
-
-## Entity relationships
-
-```mermaid
-erDiagram
-    patients ||--o| profiles : has
-    patients ||--o{ consent_events : records
-    patients ||--o{ day_revisions : records
-    patients {
-        TEXT id PK
-        TEXT auth_subject UK
-    }
-    profiles {
-        TEXT patient_id PK,FK
-        BLOB payload
-    }
-    consent_events {
-        INTEGER sequence PK
-        TEXT patient_id FK
-        TEXT purpose
-        TEXT policy_version
-        INTEGER granted
-        TEXT recorded_at
-    }
-    day_revisions {
-        TEXT patient_id PK,FK
-        TEXT day PK
-        INTEGER revision PK
-        TEXT request_id
-        BLOB payload
-        TEXT recorded_at
-    }
-```
-
-All columns are required, except that SQLite's generated integer primary key is
-supplied by SQLite. UUIDs are stored as canonical text. Foreign keys reference
-`patients.id` and use `ON DELETE CASCADE`. There is no public deletion method yet;
-the cascade is schema behavior, not a complete data-erasure workflow.
-
-## Tables and constraints
-
-### `patients`
-
-| Column | Meaning | Constraint |
+| Migration | Table | Purpose and ownership |
 |---|---|---|
-| `id` | Locally generated pseudonymous patient UUID | Primary key |
-| `auth_subject` | Verified Supabase user UUID | Required, unique |
+| 1 | `patients` | Unique clinical patient ID mapped to a unique authenticated subject |
+| 1 | `consent_events` | Append-only purpose, policy version, grant decision, timestamp |
+| 1 | `profiles` | Encrypted standalone profile; retained repository interface |
+| 1 | `day_revisions` | Encrypted per-day revisions; retained repository interface |
+| 2 | `record_revisions` | Current app's encrypted whole-record snapshots and write request UUIDs |
+| 2 | `report_snapshots` | Encrypted approved reports with source revision and timestamp |
+| 3 | `accounts` | Unique local username, credential/recovery hashes, local/trial kind |
+| 3 | `sessions` | Hashed tokens, account subject, absolute expiry, last activity |
+| 3 | `audit_events` | Account action names and timestamps |
+| 3 | `report_drafts` | Encrypted previews, owning patient, revision, one-hour expiry |
+| 3 | `attachments` | Encrypted event documents, owning patient/event ID, timestamp |
+| 3 | `share_grants` | Hashed approved-report access tokens, expiry, revocation, timestamp |
 
-`create_patient()` is idempotent for the subject and returns the existing local ID
-on repeated calls. Provisioning the identity mapping does not collect a clinical
-profile and does not require health-storage consent.
+The active HTTP app stores profiles, observations, custom symptoms, medications,
+treatments, and events together in `record_revisions`. It does not use the original
+standalone `profiles` and `day_revisions` interfaces for new patient writes.
 
-### `profiles`
+## Ownership and transactions
 
-| Column | Meaning | Constraint |
-|---|---|---|
-| `patient_id` | Owning patient | Primary key and foreign key |
-| `payload` | Encrypted JSON profile | Required BLOB |
+Foreign keys are enabled, with cascading account/patient deletion. A repository
+operation receives a server-authenticated subject and resolves the patient mapping;
+HTTP clients cannot supply a substitute ownership subject. Records enforce that
+the profile patient ID cannot change.
 
-Only one current profile is stored per patient. Saving replaces its encrypted
-payload; **profile history is not implemented**. The repository requires a mapping
-and rejects top-level `id` and `auth_subject` overrides. Detailed profile fields
-and optional-module permissions still need validation.
+Writes use `BEGIN IMMEDIATE`. An expected revision prevents stale edits; successful
+writes append a revision. `(patient_id, request_id)` is unique and allows identical
+write retries while rejecting reuse for different content. Report approval uses
+an owned draft and verifies that its source revision still matches the current
+record. Reviewed snapshots retain their original scoped source evidence.
 
-### `consent_events`
+Migrations advance `PRAGMA user_version` transactionally. A database newer than the
+application's migration list is rejected. Connections enable foreign keys,
+`busy_timeout=5000`, and `secure_delete=ON`.
 
-| Column | Meaning | Constraint |
-|---|---|---|
-| `sequence` | Global database insertion order | Auto-increment primary key |
-| `patient_id` | Owning patient | Foreign key |
-| `purpose` | Processing purpose | Repository allowlist |
-| `policy_version` | Version presented to the patient | Repository rejects blank text |
-| `granted` | Grant (`1`) or withdrawal (`0`) | SQL check allows only 0 or 1 |
-| `recorded_at` | Server-generated UTC ISO timestamp | Required text |
+## Payload model and validation
 
-Index: `consent_lookup(patient_id, purpose, sequence)`.
+A record contains profile context, explicitly logged daily entries, treatment
+history, clinical events, tracked identifiers, optional custom symptom definitions,
+and medication shortcuts. Built-in IDs come from `shared/symptoms.json`. Custom IDs
+are unique `custom_` identifiers and retain patient wording and optional mapping.
 
-The repository appends decisions and determines current consent using the greatest
-sequence for a patient/purpose. This avoids using wall-clock timestamps to order
-decisions. No update/delete methods exist for consent events, but direct SQL can
-modify them: append-only behavior is a repository contract, not a SQL trigger.
+Symptoms use present/absent/unknown state. Severity is 1–10 for present observations.
+Daily dates are canonical ISO dates and cannot be future dates. Medication relief
+is 0–10; duration is 1–1440 minutes. Text, lists, domains, event types, and lengths
+are validated before writes. The HTTP request body limit also bounds record size.
 
-### `day_revisions`
+Disabled domains cannot collect new non-unknown answers. Archived custom symptoms
+cannot collect changed non-unknown answers until restored. Unchanged historical
+observations remain accessible. Turning a domain off is not data deletion.
 
-| Column | Meaning | Constraint |
-|---|---|---|
-| `patient_id` | Owning patient | Foreign key, composite primary key |
-| `day` | Patient's symptom calendar day (`yyyy-mm-dd`) | Composite primary key |
-| `revision` | Revision number, starting at 1 | Composite primary key, SQL check > 0 |
-| `request_id` | Client-generated operation UUID | Unique together with patient ID |
-| `payload` | Encrypted complete daily entry | Required BLOB |
-| `recorded_at` | Server-generated UTC ISO timestamp | Required text |
+## Consent
 
-Primary key: `(patient_id, day, revision)`.
+Current permission is the latest consent event for a purpose. The app exposes:
 
-The primary-key index supports patient/date reads and revision lookup. The unique
-index on `(patient_id, request_id)` supports safe retries. There is no separate
-current-entry table: the maximum revision for each day is current.
-
-## Clinical payloads and missing data
-
-Clinical fields live inside authenticated encrypted JSON payloads. This keeps
-symptom names, severity, notes, bleeding, and functional impact out of readable
-SQLite columns while preserving the existing engine's `DayRecord` structure.
-Analytics decrypts the selected records in application memory; SQL cannot filter
-by symptom severity inside these encrypted payloads.
-
-Example daily payload:
-
-```json
-{
-  "date": "2026-10-02",
-  "logged": true,
-  "bleeding": "none",
-  "impact": 2,
-  "depth": "standard",
-  "symptoms": {
-    "pelvic_pain": {"state": "present", "severity": 7},
-    "fatigue": {"state": "unknown"},
-    "back_pain": {"state": "absent"}
-  }
-}
-```
-
-Rules enforced by `validate_day()`:
-
-- Date must be a canonical ISO calendar date and `logged` must be exactly `true`.
-- Bleeding, when provided, is `none`, `spotting`, `light`, `moderate`, `heavy`, or
-  `very_heavy`.
-- Impact, when provided, is an integer from 0 through 3; booleans are rejected.
-- Depth, when provided, is `quick`, `standard`, or `detailed`.
-- Symptoms are a mapping of nonempty string identifiers to observations.
-- Each observation explicitly states `present`, `absent`, or `unknown`.
-- Optional severity must be an integer 1–10 on a present observation. A zero answer
-  becomes `absent` without a severity field; absent/unknown cannot carry severity.
-
-Missing symptom keys mean unknown to the consuming engine. Missing calendar days
-have no row and are not filled with zero observations. Patient-local dates and UTC
-recording timestamps serve different purposes; timezone preferences are not yet
-persisted as a separately validated schema field.
-
-Other payload fields, including notes, medication entries, and impact domains, can
-be retained as JSON but do not yet receive dedicated validation. The symptom
-catalogue is not yet checked against IDs, and sensitive-module gating is pending.
-
-## Consent enforcement
-
-| Purpose | Currently enforced at |
+| Purpose | Controls |
 |---|---|
-| `health_storage` | `save_profile()` and `save_day()` |
-| `health_analysis` | `analysis_days()` |
-| `external_ai` | Decision can be recorded; no external AI implementation |
-| `report_export` | Decision can be recorded; no report export implementation |
+| `health_storage` | Saving/editing the working health record and documents |
+| `health_analysis` | Analysis and fresh report computation/approval |
+| `report_export` | Report approval, PDF downloads, and visit links |
 
-No decision or a latest withdrawal raises `ConsentRequired` for the relevant
-operation. The checks run within the write/analysis transaction. Existing patient
-records remain readable through `read_profile()` and `read_days()` after withdrawal
-for patient access. Callers must use `analysis_days()` for analysis instead of
-bypassing its check using ordinary reads. Withdrawal does not erase earlier data.
+Registration grants storage explicitly and records the chosen analysis decision;
+report export starts disabled for personal accounts. Trials record their agreed
+example-session purposes. The legacy repository also recognizes `external_ai`,
+but no external AI processing or app setting is implemented.
 
-Current consent checking uses the latest decision, without matching a required
-policy version. Re-consent after policy changes, actor/source metadata, deletion,
-and downstream cached-analysis invalidation remain to implement.
+Patients can read existing records and report history after withdrawal. Withdrawing
+report export blocks existing grant access as well as new PDF downloads. Permission
+withdrawal does not erase records automatically.
 
-## Daily write and read lifecycle
+## Encryption and retained metadata
 
-1. Validate the complete entry, expected revision, and request UUID.
-2. Begin an immediate transaction and resolve the verified subject to its patient.
-3. Require current health-storage consent.
-4. If the request UUID already exists for that patient, decrypt and compare its
-   payload. An identical retry returns that operation's original revision; a
-   different payload raises `Conflict`.
-5. Otherwise compare the supplied `expected_revision` with the latest day revision
-   (0 for a new day). A stale version raises `Conflict`.
-6. Increment the revision, encrypt with its patient/date/revision context, insert
-   the row, and commit. Errors roll the transaction back.
+Clinical record revisions, previews, reports, and uploaded content are encrypted
+with AES-256-GCM. Every seal uses a fresh nonce. Associated data binds payloads to
+their purpose, owning patient, record identifier, and revision where applicable.
+The protected installation key is separate from SQLite and source control.
 
-Entries are full replacements, not patches. Omitting a previously observed symptom
-in a correction makes it unknown in the new current entry; the historical entry
-remains available in the underlying revision table. There is no history-read
-repository method yet. A retry of an older operation returns its original revision
-even if a later revision exists, so reload current state before another edit.
+Usernames, ownership IDs, hashes, consent purposes, revision numbers, event IDs,
+and timestamps remain plaintext/indexed metadata. Payload encryption is not full
+SQLite-file encryption. Password/session/recovery values are stored as hashes,
+not reversible clinical ciphertext.
 
-`read_days()` selects the latest revisions within an inclusive date range, ordered
-by day. It returns `[{"revision": 1, "entry": {...}}]`. `analysis_days()` returns
-only the entry objects after checking analysis consent.
+## Retention, erasure, and exports
 
-## Encryption and keys
+Ordinary edits/removals append a new working record revision. Older revisions and
+approved snapshots remain until explicit erasure. Removing a clinical event deletes
+its associated attachment rows in the record transaction.
 
-Algorithm: AES-256-GCM through the `cryptography` library. JSON is serialized with
-stable key ordering, compact separators, and non-finite numbers disallowed.
-Each encryption uses a fresh cryptographically random 12-byte nonce.
+Domain erasure scrubs structured observations/definitions from all whole-record
+revisions, disables that domain, clears report drafts, and deletes affected snapshots
+and grants. It creates a new working revision so stale tabs cannot restore old data.
+Free-text mentions and uploaded documents are not inferred or redacted by this action.
 
-Stored envelope:
+Account deletion cascades through the owned local data. Expired sessions/drafts are
+cleaned up, and trial accounts without an active session are deleted. Independently
+exported files and OS backups are not recalled. `secure_delete` does not establish
+physical erasure of all copies on the operating system or storage device.
 
-| Byte range | Contents |
-|---|---|
-| 0–3 | Key version, unsigned big-endian integer |
-| 4–15 | 12-byte nonce |
-| 16 onward | Ciphertext and GCM authentication tag |
-
-Associated data is the UTF-8 context followed by the four-byte key-version header:
-
-- Profile context: `profile:{patient_id}`.
-- Day context: `day:{patient_id}:{date}:{revision}`.
-
-Binding prevents encrypted records from being substituted across these contexts.
-It does not prevent a privileged attacker from deleting rows or replaying an old
-profile ciphertext under the same profile context. No global integrity ledger is
-implemented.
-
-`Vault` receives a key-version mapping and an active version. Writes use the active
-key; reads choose the version in the envelope. Unknown versions fail; wrong keys or
-tampered ciphertext fail authentication. Keeping historical keys allows reads
-after rotation, but bulk re-encryption is not implemented.
-
-`load_os_key()` requires Windows Credential Manager through `keyring` and rejects
-other backends. First-time key creation must be explicit; later opens must fail if
-the key is missing rather than create a replacement. Use a stable installation/key
-identifier. Keys are independent of Supabase sessions and never stored in SQLite.
-No key recovery, backup-key wrapping, or non-Windows implementation exists yet.
-
-**Encryption boundary:** this is standard SQLite with encrypted clinical payloads,
-not SQLCipher full-file encryption. Patient IDs, Supabase subject mappings, dates,
-revision/request metadata, consent decisions, and schema are readable. The OS user
-and a process holding the key can decrypt payloads. File encryption, file permissions,
-backup protection, and retention controls remain prerequisites for real patient use.
-
-## Connections and migrations
-
-- Connections enable foreign keys and a 5-second busy timeout.
-- Repository transactions use `BEGIN IMMEDIATE`, `COMMIT`, and rollback on errors.
-- Use a connection on its owning thread; do not share it across FastAPI threads.
-- Reads outside `analysis_days()` do not take a repository write transaction.
-- WAL is not explicitly enabled. The SQLite driver's default journal configuration
-  applies; database file copying during active writes is not a supported backup plan.
-- `PRAGMA user_version` identifies the schema version. On open, missing migrations
-  execute in order in one transaction. Version 1 creates the four tables and index.
-- A database newer than the supported version is rejected. Add future migrations
-  after existing ones; do not change a migration that deployed databases have applied.
-- No downgrade, backup, or restore command is implemented.
-
-## Integration interface
-
-| Method | Contract |
-|---|---|
-| `create_patient(subject)` | Provision or return local patient UUID |
-| `record_consent(subject, purpose, policy_version, granted)` | Append a decision |
-| `save_profile(subject, profile)` | Replace encrypted profile after consent check |
-| `read_profile(subject)` | Return profile or `None` |
-| `save_day(subject, day, expected_revision=..., request_id=...)` | Save/retry entry and return revision |
-| `read_days(subject, start, end)` | Read current entries and revisions |
-| `analysis_days(subject, start, end)` | Read engine entries after analysis consent check |
-| `close()` | Close the connection |
-
-`ConsentRequired` is a permission error; `Conflict` is a value error used for stale
-revisions and mismatched retries. Invalid inputs can raise `ValueError`, `KeyError`,
-or `TypeError`; a typed request schema and consistent HTTP error translation are
-still required at the API boundary. Cryptographic errors must not be hidden by
-returning empty records or logging sensitive payloads.
-
-## Verification and next schema work
-
-The 12-test suite in `backend/tests/test_database.py` verifies reopen persistence,
-payload encryption, tamper/substitution rejection, key-version reads, consent
-withdrawal, separate analysis consent, patient isolation, retries, stale edits,
-revision retention, invalid observations, missing days, and schema-version handling.
-Tests use temporary files and ephemeral keys; OS Credential Manager and live
-Supabase authentication are not tested.
-
-Next additions are patient preferences and optional-module enforcement, validated
-symptom vocabulary, medication/treatment/clinical-event storage, detailed episodes,
-analysis runs, immutable report claims and evidence references, export/deletion,
-audits, encrypted backups, and full-file encryption. Hosted sharing and file uploads
-are deferred. Existing frontend localStorage remains a separate synthetic-data
-prototype until API integration is completed.
+Personal JSON exports contain current/retained records, decoded document contents,
+permission history, and activity; approved reports require export permission.
+The export is unencrypted and there is no automatic import/restore route.
