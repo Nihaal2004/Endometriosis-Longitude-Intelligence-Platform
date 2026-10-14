@@ -8,7 +8,7 @@
 
 import { DEFAULT_GATE } from '../../engine/patterns'
 import { DEFAULT_CYCLE_CONFIG } from '../../engine/cycles'
-import { useAnalysis } from '../store'
+import { useAnalysis } from '../data'
 
 const PIPELINE = [
   { stage: 'Patient entry', detail: 'Bleeding, pain, impact, adaptive symptom chips. Unasked questions are recorded as unknown.' },

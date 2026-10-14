@@ -12,7 +12,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { useAnalysis, useCustomLabels, useRecord } from '../store'
+import { useAnalysis, useCustomLabels, useRecord } from '../data'
 import { mainConcerns, SAFETY_STATEMENT, formatDateLong, pct } from '../../engine/brief'
 import { symptomLabel } from '../../engine/symptoms'
 import { summariseCycles } from '../../engine/cycles'
@@ -51,12 +51,17 @@ export default function Brief() {
           <div>
             <h1 style={{ fontSize: 26 }}>Longitudinal symptom summary</h1>
             <p className="mt-1.5 text-[13.5px]" style={{ color: 'var(--ink-secondary)' }}>
-              {record.profile.displayName}, {record.profile.ageRange} ·{' '}
-              {record.profile.diagnosisStatus === 'confirmed'
-                ? 'Endometriosis confirmed'
-                : record.profile.diagnosisStatus === 'suspected'
-                  ? 'Suspected endometriosis'
-                  : 'Undiagnosed'}
+              {[
+                record.profile.displayName,
+                record.profile.ageRange,
+                record.profile.diagnosisStatus === 'confirmed'
+                  ? 'Endometriosis confirmed'
+                  : record.profile.diagnosisStatus === 'suspected'
+                    ? 'Suspected endometriosis'
+                    : 'Not yet diagnosed',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           </div>
           <button

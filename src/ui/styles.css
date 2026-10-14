@@ -294,6 +294,196 @@ button {
   color: var(--ground);
 }
 
+/* --- Forms --------------------------------------------------------------- */
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+textarea.input {
+  min-height: 96px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+
+select.input {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 21px, calc(100% - 15px) 21px;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 22%, transparent);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--viz-critical);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: opacity 120ms ease, background 120ms ease;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--ground);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--hairline-strong);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--viz-critical);
+  border-color: color-mix(in srgb, var(--viz-critical) 45%, transparent);
+}
+
+.link {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--hairline-strong);
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.notice {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.notice-error {
+  background: color-mix(in srgb, var(--viz-critical) 10%, var(--surface));
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--viz-critical) 35%, transparent);
+}
+
+.notice-info {
+  background: var(--surface-sunken);
+  color: var(--ink-secondary);
+}
+
+/* Segmented control — Insights sub-navigation */
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.segmented button {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.segmented button[aria-selected='true'] {
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(46, 27, 46, 0.08);
+}
+
+/* --- Navigation ---------------------------------------------------------- */
+
+/* Phones get a bottom tab bar; wider screens use the header. */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--ground) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--hairline);
+}
+
+.tabbar a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: 50px;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tabbar a[aria-current='page'] {
+  color: var(--ink);
+}
+
+@media (min-width: 720px) {
+  .tabbar {
+    display: none;
+  }
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
 /* --- Motion -------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {

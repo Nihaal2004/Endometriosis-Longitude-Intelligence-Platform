@@ -194,10 +194,15 @@ export function CycleRing({
   days,
   size = 240,
   centre,
+  onDayClick,
+  selectedDate,
 }: {
   days: RingDay[]
   size?: number
   centre?: ReactNode
+  /** Tapping a lived day opens its log. Days not yet lived are not interactive. */
+  onDayClick?: (date: string) => void
+  selectedDate?: string
 }) {
   const [hover, setHover] = useState<TooltipState | null>(null)
   const stroke = 16
@@ -230,48 +235,78 @@ export function CycleRing({
     <div style={{ position: 'relative', width: size, height: size }}>
       <svg width={size} height={size} role="img"
         aria-label={`Cycle ring covering ${days.length} days`}>
-        {days.map((d, i) => (
-          <path
-            key={d.date}
-            d={arc(i)}
-            fill="none"
-            stroke={d.logged ? bleedColor(d.bleedLevel) : 'transparent'}
-            strokeWidth={stroke}
-            strokeLinecap="butt"
-            style={{
-              // Three distinct states, deliberately drawn differently:
-              //   logged        — solid, coral in proportion to flow
-              //   not logged    — faint dashed trace (a gap must look like a gap)
-              //   not yet lived — plain thin track, no data claim of any kind
-              ...(d.future
-                ? { stroke: 'var(--viz-grid)', strokeWidth: 4 }
-                : d.logged
-                  ? {}
-                  : { stroke: 'var(--hairline-strong)', strokeDasharray: '1.5 3', strokeWidth: 2 }),
-              cursor: d.future ? 'default' : 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              if (d.future) return
-              const rect = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect()
-              setHover({
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top,
-                content: (
-                  <>
-                    <strong>{d.date}</strong>
-                    <br />
-                    {d.logged
-                      ? `Cycle day ${d.signedCycleDay >= 0 ? `D+${d.signedCycleDay}` : `D${d.signedCycleDay}`} · ${
-                          ['no bleeding', 'spotting', 'light', 'moderate', 'heavy', 'very heavy'][d.bleedLevel]
-                        }`
-                      : 'No entry — unknown'}
-                  </>
-                ),
-              })
-            }}
-            onMouseLeave={() => setHover(null)}
-          />
-        ))}
+        {days.map((d, i) => {
+          const label = d.logged
+            ? `${d.date}, cycle day ${d.signedCycleDay >= 0 ? `D+${d.signedCycleDay}` : `D${d.signedCycleDay}`}, ${
+                ['no bleeding', 'spotting', 'light', 'moderate', 'heavy', 'very heavy'][d.bleedLevel]
+              }`
+            : `${d.date}, no entry`
+          const interactive = Boolean(onDayClick) && !d.future
+          return (
+            <g key={d.date}>
+              {/* Visible segment. Three states, deliberately drawn differently:
+                    logged        — solid, coral in proportion to flow
+                    not logged    — faint dashed trace (a gap must look like a gap)
+                    not yet lived — plain thin track, no data claim of any kind */}
+              <path
+                d={arc(i)}
+                fill="none"
+                stroke={d.logged ? bleedColor(d.bleedLevel) : 'transparent'}
+                strokeWidth={stroke}
+                strokeLinecap="butt"
+                pointerEvents="none"
+                style={
+                  d.future
+                    ? { stroke: 'var(--viz-grid)', strokeWidth: 4 }
+                    : d.logged
+                      ? undefined
+                      : { stroke: 'var(--hairline-strong)', strokeDasharray: '1.5 3', strokeWidth: 2 }
+                }
+              />
+              {d.date === selectedDate && (
+                <path d={arc(i)} fill="none" stroke="var(--ink)" strokeWidth={stroke + 6}
+                  strokeOpacity={0.18} pointerEvents="none" />
+              )}
+              {/* Hit area: the full segment width regardless of how the day is drawn,
+                  so an unlogged day is as easy to tap as a logged one. */}
+              {!d.future && (
+                <path
+                  d={arc(i)}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={stroke + 14}
+                  pointerEvents="stroke"
+                  role={interactive ? 'button' : undefined}
+                  tabIndex={interactive ? 0 : undefined}
+                  aria-label={interactive ? `Open ${label}` : undefined}
+                  style={{ cursor: interactive ? 'pointer' : 'default', outline: 'none' }}
+                  onClick={() => interactive && onDayClick!(d.date)}
+                  onKeyDown={(e) => {
+                    if (interactive && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      onDayClick!(d.date)
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    const rect = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect()
+                    setHover({
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                      content: (
+                        <>
+                          <strong>{d.date}</strong>
+                          <br />
+                          {d.logged ? label.split(', ').slice(1).join(' · ') : 'No entry — tap to add'}
+                        </>
+                      ),
+                    })
+                  }}
+                  onMouseLeave={() => setHover(null)}
+                />
+              )}
+            </g>
+          )
+        })}
 
         {/* Today marker */}
         {days.map((d, i) => {

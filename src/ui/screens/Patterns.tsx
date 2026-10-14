@@ -21,7 +21,7 @@ import {
   TableView,
   type PhaseRow,
 } from '../charts'
-import { useAnalysis, useCustomLabels } from '../store'
+import { useAnalysis, useCustomLabels } from '../data'
 import { phaseProfile } from '../../engine/features'
 import { clinicalLabel, symptomLabel } from '../../engine/symptoms'
 import { formatP, pct, round } from '../../engine/brief'

@@ -10,7 +10,7 @@
 
 import { useMemo } from 'react'
 import { BurdenRibbon } from '../charts'
-import { useAnalysis, useRecord } from '../store'
+import { useAnalysis, useRecord } from '../data'
 import { dailyBurden } from '../../engine/features'
 import { formatDateLong, pct } from '../../engine/brief'
 import { BLEEDING_LEVELS, type ClinicalEventKind } from '../../engine/types'
