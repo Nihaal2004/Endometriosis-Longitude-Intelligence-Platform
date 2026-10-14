@@ -138,6 +138,40 @@ describe('cycle segmentation', () => {
     expect(segmentCycles(days)).toHaveLength(1)
   })
 
+  it('splits periods separated by a long run of unlogged days (sparse loggers)', () => {
+    // Found by the first real end-to-end run: a patient logs bleeding on two days
+    // 27 days apart and nothing in between. That is two periods, not one 27-day
+    // bleeding run bridged across unknown days.
+    const days = [
+      day('2026-09-18', { bleeding: 'moderate' }),
+      day('2026-10-15', { bleeding: 'heavy' }),
+    ]
+    const cycles = segmentCycles(days)
+    expect(cycles.map((c) => c.startDate)).toEqual(['2026-09-18', '2026-10-15'])
+    expect(cycles[0].complete).toBe(true)
+    expect(cycles[0].lengthDays).toBe(27)
+  })
+
+  it('still bridges a day or two of missing entries inside one period', () => {
+    const days = [
+      day('2026-09-01', { bleeding: 'heavy' }),
+      // 09-02 and 09-03 not logged
+      day('2026-09-04', { bleeding: 'moderate' }),
+      day('2026-09-05', { bleeding: 'light' }),
+    ]
+    expect(segmentCycles(days)).toHaveLength(1)
+  })
+
+  it('does not invent a short cycle when a gap splits a period', () => {
+    // Four unlogged days mid-period split the run, but the second half is within
+    // the 10-day minimum, so it is not a new onset.
+    const days = [
+      day('2026-09-01', { bleeding: 'heavy' }),
+      day('2026-09-06', { bleeding: 'light' }),
+    ]
+    expect(segmentCycles(days)).toHaveLength(1)
+  })
+
   it('does not assume a 28-day cycle', () => {
     const days: DayRecord[] = []
     const lengths = [24, 33, 26, 31]

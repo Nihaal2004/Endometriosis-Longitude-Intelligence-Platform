@@ -71,10 +71,21 @@ export interface CycleConfig {
   windowAfter: number
   /** Cycles longer than this are flagged as probably spanning an unlogged period. */
   maxPlausibleCycleDays: number
+  /**
+   * The longest stretch, in days, between two logged flow days that still counts as
+   * one continuous bleeding run when the days between are unlogged. Bridging a
+   * day or two of missing entries mid-period is right; bridging weeks is not — two
+   * flow days 27 days apart with nothing logged between are two periods.
+   */
+  maxRunGapDays: number
 }
 
 export const DEFAULT_CYCLE_CONFIG: CycleConfig = {
   minCycleGapDays: 10,
+  // 3 = up to two unlogged days inside a period. Bleeding runs are rarely longer than
+  // nine days, so anything beyond this is better read as a new run; the 10-day
+  // minimum above still stops a short gap from inventing a new cycle.
+  maxRunGapDays: 3,
   // D-2 .. D+3, a 6-day window. Chosen to match the perimenstrual window used in the
   // endometriosis pain literature (symptoms characteristically begin 1-2 days before
   // onset and persist through early flow), and fixed in advance rather than tuned per
@@ -108,17 +119,27 @@ export function segmentCycles(
   const onsets: string[] = []
 
   let previousWasFlow = false
+  let lastLoggedDate: string | null = null
   for (const day of sorted) {
+    if (!day.logged) continue
     const flow = isFlow(day.bleeding)
-    if (flow && !previousWasFlow) {
+    // A flow day continues the current run only if the previous LOGGED day was
+    // also flow and close enough. A day or two of missing entries inside a period
+    // does not break it — we do not know what happened, so we do not manufacture a
+    // gap — but a long silence does, or sparse loggers would have every period
+    // after the first absorbed into one endless run.
+    const continuesRun =
+      previousWasFlow &&
+      lastLoggedDate !== null &&
+      daysBetween(lastLoggedDate, day.date) <= config.maxRunGapDays
+    if (flow && !continuesRun) {
       const last = onsets[onsets.length - 1]
       if (!last || daysBetween(last, day.date) >= config.minCycleGapDays) {
         onsets.push(day.date)
       }
     }
-    // An unlogged day does not break a bleeding run — we do not know what happened,
-    // so we do not manufacture a gap.
-    if (day.logged) previousWasFlow = flow
+    previousWasFlow = flow
+    lastLoggedDate = day.date
   }
 
   if (onsets.length === 0) return []

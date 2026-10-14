@@ -74,8 +74,12 @@ export function independentOnsets(
   const onsets: string[] = []
   for (let i = 0; i < loggedDays.length; i++) {
     if (!isFlowDay(loggedDays[i])) continue
-    const previousLoggedWasFlow = i > 0 && isFlowDay(loggedDays[i - 1])
-    if (previousLoggedWasFlow) continue // mid-run, not an onset
+    const previous = i > 0 ? loggedDays[i - 1] : null
+    const midRun =
+      previous !== null &&
+      isFlowDay(previous) &&
+      daysBetween(previous.date, loggedDays[i].date) <= config.maxRunGapDays
+    if (midRun) continue // continues a run already counted
 
     const last = onsets[onsets.length - 1]
     if (last === undefined || daysBetween(last, loggedDays[i].date) >= config.minCycleGapDays) {

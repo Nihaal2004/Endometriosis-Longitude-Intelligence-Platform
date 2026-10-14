@@ -92,6 +92,16 @@ describe('independent re-derivation agrees with the primary path', () => {
     expect(cycles.length).toBeGreaterThan(3)
   })
 
+  it('agrees with the primary path on a sparse record with long silences', () => {
+    const sparse = [
+      { date: '2026-09-18', logged: true, bleeding: 'moderate' as const, symptoms: {} },
+      { date: '2026-10-15', logged: true, bleeding: 'heavy' as const, symptoms: {} },
+      { date: '2026-11-11', logged: true, bleeding: 'light' as const, symptoms: {} },
+    ]
+    expect(independentOnsets(sparse)).toEqual(segmentCycles(sparse).map((c) => c.startDate))
+    expect(independentOnsets(sparse)).toHaveLength(3)
+  })
+
   it('survives unlogged days inside a bleeding run without splitting the cycle', () => {
     const record = buildPatient('gaps')
     // Blank out a scattering of days, including some bleeding days.
