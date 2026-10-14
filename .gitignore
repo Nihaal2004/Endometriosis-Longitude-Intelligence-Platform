@@ -3,3 +3,19 @@ dist/
 .DS_Store
 *.local
 .vite/
+
+# Earlier local Python backend: holds an encryption key and a database. Never commit.
+backend/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Supabase local state
+supabase/.branches
+supabase/.temp
+
+
+# TypeScript incremental build cache
+*.tsbuildinfo
