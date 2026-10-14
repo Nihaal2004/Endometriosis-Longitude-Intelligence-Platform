@@ -12,25 +12,52 @@ It does not diagnose, does not score risk, does not stage disease, and does not 
 
 ## Run it
 
+**Demo only (no backend):**
+
 ```bash
 npm install
-npm run dev     # http://localhost:5173
-npm test        # 111 tests
-npm run eval    # regenerate all reported metrics (~60s)
+npm run dev          # open the app, choose a demo patient on the sign-in screen
 ```
 
-Three demo patients ship with the prototype, each exercising a different engine behaviour: **Maya** (a clear perimenstrual pattern), **Priya** (persistent non-cyclical pain with a treatment episode), and **Aisha** (a sparse record where the engine withholds nearly everything).
+**With accounts, against a local Supabase** (needs Docker):
 
-## Screens
+```bash
+supabase start       # prints the API URL and the publishable (anon) key
+cp .env.example .env.local   # paste the key into VITE_SUPABASE_ANON_KEY
+npm run dev          # register; confirmation emails arrive in Mailpit, http://127.0.0.1:54324
+```
 
-| Screen | What it shows |
+**Checks:**
+
+```bash
+npm test             # 170 unit tests: statistics, engine, data layer, check-in rules, sharing
+npm run test:db      # 46 pgTAP tests: row-level security, history, sharing, erasure
+npm run e2e          # end-to-end account flow (27 checks) + phone layout (18 checks)
+npm run eval         # regenerate the engine evaluation metrics (~60s)
+```
+
+**Android** (Capacitor 8 — needs JDK 21 and the Android SDK):
+
+```bash
+npm run android:apk  # web build in "android" mode, cap sync, then gradle assembleDebug
+```
+
+The emulator reaches a laptop's local Supabase at `10.0.2.2`; put that in `.env.android.local`. iOS needs a Mac with Xcode, or a cloud build service.
+
+Three demo patients ship with the app, each exercising a different engine behaviour: **Maya** (a clear perimenstrual pattern), **Priya** (persistent pain with a treatment that helped one symptom), and **Aisha** (a sparse record where the engine withholds everything).
+
+## The app
+
+Four tabs, so the daily screen stays a 20-second check-in and the analysis lives one tap away.
+
+| Tab | What it holds |
 |---|---|
-| **Today** | The adaptive check-in — ~7 fields out of a 100+ field model, with the skipped questions explained |
-| **Patterns** | Cycle-phase heatmap, findings with test/effect size/CI/coverage, and findings *withheld* with reasons |
-| **Timeline** | Symptom burden against treatment periods and healthcare events |
-| **Brief** | The clinician one-pager; click any sentence for its evidence |
-| **Validation** | Live engine metrics from the evaluation harness |
-| **Method** | The pipeline, the tests, and every parameter with its rationale |
+| **Today** | The cycle ring (tap any day to open its log; page back through earlier cycles) and today's check-in |
+| **Calendar** | The month at a glance — bleeding, logged, not logged. Tap any past day to change it |
+| **Insights** | The clinician **Report** (share it as an expiring link, or save a PDF), **Patterns**, **Timeline**, and **How it works** (method and validation) |
+| **Me** | Profile, reminders, app lock, treatments and appointments, data download, consent, account deletion |
+
+Accounts are email and password (Supabase Auth, PKCE). Every entry is stored on the device first and synced in the background, so logging never waits for a connection.
 
 ## How it works
 
@@ -71,8 +98,18 @@ A plain ratio rule beats us on F1 — and reports ten times as many patterns tha
 
 ## Status
 
-Prototype. No authentication, encryption, sync, consent or audit layer — all deferred and none pretended. It stores state in `localStorage` and must never hold real patient data.
+Built for a small pilot in India; not yet deployed. Accounts, row-level security, offline sync, revision history, per-purpose consent (DPDP Act 2023), audit, selective sharing, data export and erasure all exist and are tested against a local Supabase.
+
+**Before any real patient is enrolled:**
+
+1. Create the Supabase project in **ap-south-1 (Mumbai)** — the region can't be changed later — and run the migration.
+2. Configure a custom SMTP provider. Supabase's built-in mailer is for development and allows only a few emails an hour.
+3. Add the production web URL and `com.medtrace.app://auth/callback` to Supabase's allowed redirect URLs.
+4. Name a real grievance officer in `src/ui/privacy.ts` and finalise the privacy-notice wording.
+5. Obtain institutional ethics approval if the pilot is a study.
+
+The app is for adults: DPDP requires verifiable parental consent for anyone under 18, which is not built.
 
 ## Stack
 
-React · TypeScript · Vite · Tailwind · Zustand · Vitest. Charts are hand-built SVG; the chart palette was validated for colour-vision deficiency at all pairs in both light and dark modes.
+React · TypeScript · Vite · Tailwind · Zustand · Dexie · Supabase (Auth, Postgres, RLS) · Capacitor 8 · Vitest · pgTAP · Playwright. Charts are hand-built SVG; the chart palette was validated for colour-vision deficiency at all pairs in both light and dark modes.
