@@ -14,6 +14,9 @@
 import { useMemo, useState } from 'react'
 import { useAnalysis, useCustomLabels, useData, useRecord } from '../data'
 import { SharePanel } from '../share/SharePanel'
+import { buildShareSnapshot, SHARE_SECTIONS } from '../share/snapshot'
+import { deliverFile } from '../../native/files'
+import { isNative } from '../../native/platform'
 import { mainConcerns, SAFETY_STATEMENT, formatDateLong, pct } from '../../engine/brief'
 import { symptomLabel } from '../../engine/symptoms'
 import { summariseCycles } from '../../engine/cycles'
@@ -33,6 +36,33 @@ export default function Brief() {
   const customLabels = useCustomLabels()
   const { mode } = useData()
   const [openClaim, setOpenClaim] = useState<Claim | null>(null)
+
+  // Browsers print the styled page; inside the Android WebView print() does
+  // nothing, so phones get a generated PDF handed to the share sheet. The PDF is
+  // built from the same snapshot a share link uses, with every section included
+  // because this is the patient's own copy.
+  async function printOrShare() {
+    if (!isNative) {
+      window.print()
+      return
+    }
+    const snapshot = buildShareSnapshot({
+      claims: verifiedClaims,
+      record,
+      window: {
+        start: ctx.window.start,
+        end: ctx.window.end,
+        loggedDays: ctx.loggedDays,
+        calendarDays: ctx.calendarDays,
+        completeCycles: ctx.windowCycles.filter((c) => c.complete).length,
+      },
+      concerns: mainConcerns(ctx, 4, customLabels),
+      selected: new Set(SHARE_SECTIONS.map((s) => s.id)),
+    })
+    // Loaded on demand: the PDF library is large and only phones use this path.
+    const { buildReportPdf } = await import('../share/reportPdf')
+    await deliverFile(`medtrace-report-${ctx.window.end}.pdf`, buildReportPdf(snapshot), 'MedTrace report')
+  }
 
   const concerns = useMemo(() => mainConcerns(ctx, 4, customLabels), [ctx, customLabels])
   // Window-scoped, matching the claims beneath. These tiles and the prose must agree —
@@ -67,11 +97,11 @@ export default function Brief() {
             </p>
           </div>
           <button
-            onClick={() => window.print()}
+            onClick={() => void printOrShare()}
             className="no-print focus-ring rounded-full px-4 py-2 text-[13px] font-medium"
             style={{ border: '1px solid var(--hairline-strong)', background: 'transparent', color: 'var(--ink-secondary)' }}
           >
-            Print / PDF
+            {isNative ? 'Save as PDF' : 'Print / PDF'}
           </button>
         </div>
 

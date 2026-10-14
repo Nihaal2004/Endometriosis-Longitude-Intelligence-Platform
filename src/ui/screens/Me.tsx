@@ -10,6 +10,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PERSONAS } from '../../data/personas'
 import { destroyLocal } from '../../data/local'
+import { deliverFile } from '../../native/files'
+import { isNative } from '../../native/platform'
+import { requestReminderPermission } from '../../native/reminders'
+import { canUseAppLock, isAppLockEnabled, setAppLock } from '../../native/AppLock'
 import { supabase } from '../../data/supabase'
 import { getSymptom, symptomLabel } from '../../engine/symptoms'
 import type { ClinicalEvent, ClinicalEventKind, TreatmentEpisode, TreatmentKind } from '../../engine/types'
@@ -53,6 +57,7 @@ export default function Me() {
       <h1 style={{ fontSize: 28 }}>Me</h1>
       {mode === 'demo' ? <DemoPanel /> : <AccountPanel />}
       {mode === 'account' && <ProfileCard />}
+      {mode === 'account' && <RemindersAndLock />}
       <HealthHistory />
       {mode === 'account' && <DataRights />}
       <Appearance />
@@ -201,6 +206,82 @@ function ProfileCard() {
         </button>
         {saved && <span className="text-[13px]" style={{ color: 'var(--sage)' }}>Saved</span>}
       </div>
+    </Card>
+  )
+}
+
+function RemindersAndLock() {
+  const { profileRow, repo } = useData()
+  const pref = profileRow?.reminder ?? 'daily'
+  const [time, setTime] = useState((profileRow?.reminder_time ?? '20:00').slice(0, 5))
+  const [lockOn, setLockOn] = useState<boolean | null>(null)
+  const [lockAvailable, setLockAvailable] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isNative) return
+    void isAppLockEnabled().then(setLockOn)
+    void canUseAppLock().then(setLockAvailable)
+  }, [])
+
+  async function choose(next: 'daily' | 'period' | 'none') {
+    setMessage(null)
+    if (next !== 'none' && isNative && !(await requestReminderPermission())) {
+      setMessage('Notifications are turned off for MedTrace in your phone’s settings.')
+    }
+    await repo?.updateProfile({ reminder: next })
+  }
+
+  async function toggleLock(next: boolean) {
+    setMessage(null)
+    const ok = await setAppLock(next)
+    if (ok) setLockOn(next)
+    else if (next) setMessage('Couldn’t confirm it’s you, so the lock wasn’t turned on.')
+  }
+
+  return (
+    <Card title="Reminders" sub="Reminders only ever say “Your check-in is ready”. No streaks, no messages about missed days.">
+      <div className="segmented" role="tablist" aria-label="Reminder frequency">
+        {([['daily', 'Every day'], ['period', 'During my period'], ['none', 'Off']] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={pref === id} className="focus-ring"
+            onClick={() => void choose(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {pref !== 'none' && (
+        <label className="mt-4 block max-w-[180px]">
+          <span className="field-label">Time</span>
+          <input className="input" type="time" value={time}
+            onChange={(e) => setTime(e.target.value)}
+            onBlur={() => void repo?.updateProfile({ reminder_time: time })} />
+        </label>
+      )}
+      {pref === 'period' && (
+        <p className="mt-3 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+          Reminds you the evening after a day you logged bleeding, until bleeding stops. MedTrace doesn’t predict
+          when your period will come.
+        </p>
+      )}
+      {!isNative && pref !== 'none' && (
+        <p className="mt-3 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+          Reminders are delivered by the phone app.
+        </p>
+      )}
+
+      {isNative && lockAvailable && lockOn !== null && (
+        <label className="mt-6 flex items-start justify-between gap-4 rounded-xl px-4 py-3" style={{ background: 'var(--surface-sunken)' }}>
+          <span>
+            <span className="block text-[14px] font-semibold">Lock the app</span>
+            <span className="block text-[12.5px]" style={{ color: 'var(--ink-secondary)' }}>
+              Ask for your fingerprint, face or phone PIN when MedTrace opens.
+            </span>
+          </span>
+          <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" style={{ accentColor: 'var(--ink)' }}
+            checked={lockOn} onChange={(e) => void toggleLock(e.target.checked)} />
+        </label>
+      )}
+      {message && <p className="notice notice-error mt-3">{message}</p>}
     </Card>
   )
 }
@@ -535,12 +616,7 @@ function DataRights() {
           : data
       }
       const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `medtrace-export-${new Date().toISOString().slice(0, 10)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      await deliverFile(`medtrace-export-${new Date().toISOString().slice(0, 10)}.json`, blob, 'Your MedTrace data')
       await repo.audit('data_exported')
     } catch {
       setError('Couldn’t download your data. Check your connection and try again.')

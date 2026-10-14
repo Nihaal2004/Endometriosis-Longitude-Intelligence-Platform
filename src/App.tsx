@@ -13,15 +13,15 @@
  *   6. Otherwise                     → the app
  */
 
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { getPersona } from './data/personas'
+import { AppLock } from './native/AppLock'
 import { AuthProvider, useAuth } from './ui/auth/AuthProvider'
 import { DataProvider, useData } from './ui/data'
 import { useApp } from './ui/store'
 import Calendar from './ui/screens/Calendar'
 import DayLog from './ui/screens/DayLog'
-import Insights from './ui/screens/Insights'
 import Me from './ui/screens/Me'
 import Onboarding from './ui/screens/Onboarding'
 import Privacy from './ui/screens/Privacy'
@@ -34,14 +34,20 @@ import Register from './ui/screens/auth/Register'
 import ResetPassword from './ui/screens/auth/ResetPassword'
 import { Wordmark } from './ui/screens/auth/AuthLayout'
 
+// Insights carries the charts, the validation metrics and the clinician report.
+// None of it is needed to log a day, so it loads on first visit, not at launch.
+const Insights = lazy(() => import('./ui/screens/Insights'))
+
 export default function App() {
   return (
-    <AuthProvider>
-      <DataProvider>
-        <ThemeSync />
-        <AppRoutes />
-      </DataProvider>
-    </AuthProvider>
+    <AppLock>
+      <AuthProvider>
+        <DataProvider>
+          <ThemeSync />
+          <AppRoutes />
+        </DataProvider>
+      </AuthProvider>
+    </AppLock>
   )
 }
 
@@ -122,12 +128,16 @@ function AppRoutes() {
         <Route path="/log/:date" element={<DayLog />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/insights" element={<Navigate to="/insights/report" replace />} />
-        <Route path="/insights/:section" element={<Insights />} />
+        <Route path="/insights/:section" element={<Suspense fallback={<Loading />}><Insights /></Suspense>} />
         <Route path="/me" element={<Me />} />
       </Route>
       <Route path="*" element={<Navigate to="/today" replace />} />
     </Routes>
   )
+}
+
+function Loading() {
+  return <p className="py-16 text-center text-[13px]" style={{ color: 'var(--ink-muted)' }}>Loading…</p>
 }
 
 function Splash({ offline = false, onRetry }: { offline?: boolean; onRetry?: () => void }) {

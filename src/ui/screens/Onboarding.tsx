@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { DEFAULT_TRACKED_SYMPTOMS, SYMPTOMS } from '../../engine/symptoms'
 import type { SymptomDomain } from '../../engine/types'
 import { useData } from '../data'
+import { requestReminderPermission } from '../../native/reminders'
 import { CONSENT_PURPOSES, NOTICE_VERSION } from '../privacy'
 import { Wordmark } from './auth/AuthLayout'
 import { Check } from './auth/Register'
@@ -74,6 +75,8 @@ export default function Onboarding() {
       onboarded_at: new Date().toISOString(),
     })
     await repo.audit('onboarding_completed')
+    // Ask for notification permission at the moment it makes sense, not on launch.
+    if (reminder !== 'none') await requestReminderPermission().catch(() => false)
     setBusy(false)
     navigate('/today', { replace: true })
   }

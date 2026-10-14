@@ -8,6 +8,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AuthError, Session, User } from '@supabase/supabase-js'
 import { authRedirectUrl, supabase } from '../../data/supabase'
+import { startNativeBridge } from '../../native/bridge'
 
 interface AuthContextValue {
   session: Session | null
@@ -17,6 +18,9 @@ interface AuthContextValue {
   /** True after the patient arrives from a password-reset email. */
   recovering: boolean
   configured: boolean
+  /** A message for the sign-in screen, e.g. after an expired email link opened the app. */
+  notice: string | null
+  clearNotice(): void
   signIn(email: string, password: string): Promise<AuthResult>
   signUp(email: string, password: string, ageConfirmed18: boolean): Promise<AuthResult>
   sendPasswordReset(email: string): Promise<AuthResult>
@@ -63,6 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(Boolean(supabase))
   const [recovering, setRecovering] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    startNativeBridge(setNotice)
+  }, [])
 
   useEffect(() => {
     if (!supabase) return
@@ -97,6 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       recovering,
       configured: Boolean(supabase),
+      notice,
+      clearNotice: () => setNotice(null),
 
       async signIn(email, password) {
         if (!supabase) return { ok: false, message: 'Accounts are not configured for this build.' }
@@ -156,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut()
       },
     }),
-    [session, loading, recovering],
+    [session, loading, recovering, notice],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

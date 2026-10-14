@@ -6,7 +6,7 @@ import { useApp } from '../../store'
 import { AuthLayout, Field, PasswordInput, isPlausibleEmail } from './AuthLayout'
 
 export default function Login() {
-  const { signIn, configured } = useAuth()
+  const { signIn, configured, notice, clearNotice } = useAuth()
   const enterDemo = useApp((s) => s.enterDemo)
   const navigate = useNavigate()
 
@@ -33,6 +33,13 @@ export default function Login() {
       subtitle="Your record, your patterns, and a report you can take to your next appointment."
       footer={<DemoPicker onPick={(id) => { enterDemo(id); navigate('/today') }} />}
     >
+      {notice && (
+        <p className="notice notice-info mb-5" role="status">
+          {notice}{' '}
+          <button type="button" className="link text-[13px]" onClick={clearNotice}>Dismiss</button>
+        </p>
+      )}
+
       {!configured && (
         <p className="notice notice-info mb-5">
           Accounts aren’t set up in this build. You can still explore a demo patient below.

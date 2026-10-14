@@ -27,6 +27,7 @@ import { addDays, daysBetween } from '../engine/cycles'
 import { defaultWindow, type AnalysisWindow } from '../engine/features'
 import type { DayRecord, PatientRecord } from '../engine/types'
 import { localToday } from '../lib/dates'
+import { syncReminders } from '../native/reminders'
 import { useAuth } from './auth/AuthProvider'
 import { analyse, buildDemoRecord, useApp, type Analysis } from './store'
 
@@ -163,6 +164,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       repoRef.current = null
     }
   }, [user])
+
+  // Keep phone reminders in line with the preference and the record. Period-mode
+  // reminders depend on what was logged, so this re-runs as entries change.
+  const reminderPref = profileRow?.reminder
+  const reminderTime = profileRow?.reminder_time
+  useEffect(() => {
+    if (!user || !accountRecord || !reminderPref) return
+    void syncReminders(reminderPref, accountRecord.days, today, reminderTime).catch(() => {})
+  }, [user, accountRecord, reminderPref, reminderTime, today])
 
   const signOutSafely = useCallback(
     async (force = false) => {

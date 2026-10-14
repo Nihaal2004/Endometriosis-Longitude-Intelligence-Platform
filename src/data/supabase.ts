@@ -10,15 +10,14 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { authStorage, isNative, NATIVE_AUTH_REDIRECT } from '../native/platform'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
 /** Where confirmation and password-reset emails send the patient back to. */
 export function authRedirectUrl(): string {
-  // Native builds override this with the app's deep-link scheme (Capacitor milestone).
-  const native = (globalThis as { __MEDTRACE_NATIVE_REDIRECT__?: string }).__MEDTRACE_NATIVE_REDIRECT__
-  if (native) return native
+  if (isNative) return NATIVE_AUTH_REDIRECT
   // No hash: the PKCE code arrives as ?code=..., which a HashRouter route would swallow.
   return `${window.location.origin}${window.location.pathname}`
 }
@@ -30,7 +29,10 @@ export const supabase: SupabaseClient | null =
           flowType: 'pkce',
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: true,
+          storage: authStorage,
+          // On the web the confirmation link lands on our own URL with ?code=.
+          // On a phone it arrives as a deep link, handled in native/bridge.ts.
+          detectSessionInUrl: !isNative,
         },
       })
     : null
