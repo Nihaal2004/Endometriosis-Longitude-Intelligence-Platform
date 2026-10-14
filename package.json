@@ -10,9 +10,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval": "tsx src/eval/run-eval.ts"
+    "eval": "tsx src/eval/run-eval.ts",
+    "test:db": "supabase test db",
+    "e2e": "node e2e/account-flow.mjs && node e2e/phone-layout.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "dexie": "^4.4.6",
     "framer-motion": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -24,6 +28,7 @@
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "fake-indexeddb": "^6.2.5",
     "playwright": "^1.63.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.2",
