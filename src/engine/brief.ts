@@ -313,12 +313,25 @@ export function generateBrief(
     ),
   )
 
-  if (cycleSummary.completeCount > 0) {
+  if (cycleSummary.completeCount === 1) {
+    // One cycle has a length, not a median or a range ("range 14–14" reads as an error).
     claims.push(
       claim(
         'period',
         'period',
-        `${cycleSummary.completeCount} complete cycle${cycleSummary.completeCount === 1 ? '' : 's'} observed, ` +
+        `1 complete cycle observed, ${cycleSummary.medianLength} days long. ` +
+          `Cycle timing is derived from recorded bleeding, not from a predicted cycle.`,
+        { completeCycles: 1, medianLength: cycleSummary.medianLength ?? 0 },
+        [],
+        ':cycles',
+      ),
+    )
+  } else if (cycleSummary.completeCount > 1) {
+    claims.push(
+      claim(
+        'period',
+        'period',
+        `${cycleSummary.completeCount} complete cycles observed, ` +
           `median length ${cycleSummary.medianLength} days (range ${cycleSummary.minLength}–${cycleSummary.maxLength}). ` +
           `Cycle timing is derived from recorded bleeding, not from a predicted cycle.`,
         {

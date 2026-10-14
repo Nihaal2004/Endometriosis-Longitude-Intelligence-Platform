@@ -554,8 +554,13 @@ function DataRights() {
     setError(null)
     const { error: e } = await supabase.rpc('delete_my_account')
     if (e) return setError('Couldn’t delete your account. Check your connection and try again.')
-    await destroyLocal(user.id)
-    await supabase.auth.signOut()
+    // The user and their server sessions are already gone. supabase-js still calls
+    // /logout, gets a 403 for the missing user, treats that as success, and clears
+    // the local session — the 403 in the network log is expected. Signing out before
+    // deleting the local store also tears down the repository first.
+    const uid = user.id
+    await supabase.auth.signOut({ scope: 'local' })
+    await destroyLocal(uid)
     navigate('/login', { replace: true })
   }
 

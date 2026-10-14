@@ -55,8 +55,16 @@ const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
 const page = await context.newPage()
 const errors = []
+// After account deletion, supabase-js calls /logout for a user that no longer
+// exists; the server answers 403 and the library treats that as success. That
+// one response is expected, so it is the only one tolerated — and only once the
+// deletion step has started.
+let deleting = false
+const expectedAfterDeletion = (text) => deleting && /auth\/v1\/logout|status of 403/.test(text)
+const record = (text) => { if (!expectedAfterDeletion(text)) errors.push(text) }
 page.on('pageerror', (e) => errors.push(e.message))
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+page.on('console', (m) => { if (m.type() === 'error') record(m.text()) })
+page.on('response', (r) => { if (r.status() >= 400) record(`HTTP ${r.status()} ${r.request().method()} ${r.url().replace(/\?.*/, '')}`) })
 
 try {
   // --- Register ---------------------------------------------------------
@@ -182,7 +190,51 @@ try {
   await page.getByText('Dienogest 2 mg').waitFor()
   await shot(page, '10-me')
 
+  // --- Share with a clinician ------------------------------------------------
+  await page.getByRole('link', { name: 'Insights' }).first().click()
+  await page.getByRole('button', { name: 'Create a share link' }).click()
+  await page.getByRole('checkbox', { name: 'Functional impact' }).uncheck()
+  await page.getByRole('button', { name: 'Preview' }).click()
+  await page.getByText('Preview — exactly what the clinician will see').waitFor()
+  await shot(page, '11-share-preview')
+  await page.getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('button', { name: 'Create link' }).click()
+  const linkBox = page.getByLabel('Share link')
+  await linkBox.waitFor()
+  const shareLink = await linkBox.inputValue()
+  check('a share link is created and shown once', shareLink.includes('/#/s/'))
+
+  const tokenPart = shareLink.split('/#/s/')[1]
+  check(
+    'only the hash of the token is stored',
+    Number(sql(`select count(*) from share_grants where token_hash = '${tokenPart}'`)) === 0 &&
+      Number(sql(`select count(*) from share_grants where user_id = '${uid}'`)) === 1,
+  )
+
+  // A clinician, signed out, in a separate browser.
+  const clinician = await browser.newContext({ viewport: { width: 1100, height: 900 } })
+  const cpage = await clinician.newPage()
+  await cpage.goto(shareLink)
+  await cpage.getByRole('heading', { name: 'Longitudinal symptom summary' }).waitFor()
+  const sharedText = await cpage.locator('article').innerText()
+  check('the clinician sees the report without an account', /patient-reported/i.test(sharedText))
+  check('an unticked section is not in the shared copy', !/FUNCTIONAL IMPACT/i.test(sharedText))
+  if (OUT) await cpage.screenshot({ path: `${OUT}/12-clinician-view.png`, fullPage: true })
+  check(
+    'the view was logged in the patient’s audit trail',
+    Number(sql(`select count(*) from audit_events where user_id = '${uid}' and action = 'share_link_viewed'`)) === 1,
+  )
+
+  await page.getByRole('button', { name: 'Done' }).click()
+  await page.getByRole('button', { name: 'Revoke' }).first().click()
+  await page.waitForTimeout(800)
+  await cpage.reload()
+  await cpage.getByRole('heading', { name: 'This report is no longer available' }).waitFor()
+  check('a revoked link stops working immediately', true)
+  await clinician.close()
+
   // --- Sign out wipes the device; sign in restores from the server ---------
+  await page.getByRole('link', { name: 'Me' }).first().click()
   await page.waitForTimeout(2000)
   await page.getByRole('button', { name: 'Sign out' }).click()
   await page.getByRole('heading', { name: 'Welcome back' }).waitFor()
@@ -198,6 +250,25 @@ try {
   await page.getByText('logged', { exact: false }).first().waitFor()
   const moderateSelected = await page.getByRole('button', { name: 'Moderate', exact: true }).getAttribute('data-selected')
   check('the edited past day came back from the server', moderateSelected === 'true')
+
+  // --- Erasure ------------------------------------------------------------
+  await page.getByRole('link', { name: 'Me' }).first().click()
+  await page.getByRole('button', { name: 'Delete account…' }).click()
+  const erase = page.getByRole('button', { name: 'Permanently delete' })
+  check('deletion needs the confirmation word', await erase.isDisabled())
+  await page.getByLabel('Type DELETE to confirm').fill('DELETE')
+  deleting = true
+  await erase.click()
+  await page.getByRole('heading', { name: 'Welcome back' }).waitFor()
+  const remaining = Number(
+    sql(`select (select count(*) from auth.users where id = '${uid}')
+          + (select count(*) from day_entries where user_id = '${uid}')
+          + (select count(*) from day_entry_revisions where user_id = '${uid}')
+          + (select count(*) from consents where user_id = '${uid}')
+          + (select count(*) from share_grants where user_id = '${uid}')
+          + (select count(*) from audit_events where user_id = '${uid}')`),
+  )
+  check('deleting the account erases every row', remaining === 0, `${remaining} rows left`)
 
   check('no console or page errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 } catch (err) {

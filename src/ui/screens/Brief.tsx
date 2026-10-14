@@ -12,7 +12,8 @@
  */
 
 import { useMemo, useState } from 'react'
-import { useAnalysis, useCustomLabels, useRecord } from '../data'
+import { useAnalysis, useCustomLabels, useData, useRecord } from '../data'
+import { SharePanel } from '../share/SharePanel'
 import { mainConcerns, SAFETY_STATEMENT, formatDateLong, pct } from '../../engine/brief'
 import { symptomLabel } from '../../engine/symptoms'
 import { summariseCycles } from '../../engine/cycles'
@@ -30,6 +31,7 @@ export default function Brief() {
   const { ctx, brief, verifiedClaims, rejectedClaims, fidelity } = useAnalysis()
   const record = useRecord()
   const customLabels = useCustomLabels()
+  const { mode } = useData()
   const [openClaim, setOpenClaim] = useState<Claim | null>(null)
 
   const concerns = useMemo(() => mainConcerns(ctx, 4, customLabels), [ctx, customLabels])
@@ -163,6 +165,7 @@ export default function Brief() {
 
       {/* --- Sidebar --- */}
       <aside className="no-print space-y-4">
+        {mode === 'account' && <SharePanel />}
         <div className="card p-4">
           <h2 style={{ fontSize: 15 }}>Verification</h2>
           <p className="mt-1.5 text-[12.5px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>

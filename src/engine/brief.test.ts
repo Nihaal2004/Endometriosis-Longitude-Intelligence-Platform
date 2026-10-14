@@ -148,6 +148,23 @@ describe('brief generation', () => {
     }
   })
 
+  it('describes a single cycle by its length, not a median and a range', () => {
+    const days = [
+      { date: '2026-10-01', logged: true, bleeding: 'heavy' as const, symptoms: {} },
+      { date: '2026-10-15', logged: true, bleeding: 'heavy' as const, symptoms: {} },
+    ]
+    const single = buildFeatureContext(
+      { ...record, days, treatments: [], clinicalEvents: [] },
+      { start: '2026-10-01', end: '2026-10-15' },
+    )
+    const b = generateBrief(single, [], [])
+    const cycles = b.claims.find((c) => c.id === 'period:cycles')!
+    expect(cycles.text).toContain('1 complete cycle observed, 14 days long.')
+    expect(cycles.text).not.toContain('range')
+    const report = verifyBrief(b.claims, { ...record, days }, b.windowStart, b.windowEnd)
+    expect(report.verifiedClaims).toBe(report.totalClaims)
+  })
+
   it('caps the number of longitudinal findings so the brief stays short', () => {
     const capped = generateBrief(ctx, brief.findings, brief.suppressed, {
       maxFindings: 2,

@@ -14,7 +14,7 @@
  */
 
 import { useEffect } from 'react'
-import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { getPersona } from './data/personas'
 import { AuthProvider, useAuth } from './ui/auth/AuthProvider'
 import { DataProvider, useData } from './ui/data'
@@ -25,6 +25,7 @@ import Insights from './ui/screens/Insights'
 import Me from './ui/screens/Me'
 import Onboarding from './ui/screens/Onboarding'
 import Privacy from './ui/screens/Privacy'
+import ShareView from './ui/screens/ShareView'
 import Today from './ui/screens/Today'
 import CheckEmail from './ui/screens/auth/CheckEmail'
 import ForgotPassword from './ui/screens/auth/ForgotPassword'
@@ -57,6 +58,17 @@ function ThemeSync() {
 function AppRoutes() {
   const auth = useAuth()
   const data = useData()
+  const location = useLocation()
+
+  // 0. A clinician opening a share link needs no account, and a signed-in
+  //    patient opening one sees it too. It bypasses every guard below.
+  if (location.pathname.startsWith('/s/')) {
+    return (
+      <Routes>
+        <Route path="/s/:token" element={<ShareView />} />
+      </Routes>
+    )
+  }
 
   // 1
   if (auth.loading) return <Splash />
