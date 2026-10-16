@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf'
 import { formatDateLong } from '../../engine/brief'
 import type { SharedReport } from './snapshot'
 
-const STATUS: Record<SharedReport['patient']['diagnosisStatus'], string> = {
+const STATUS: Record<NonNullable<SharedReport['patient']['diagnosisStatus']>, string> = {
   confirmed: 'Endometriosis confirmed',
   suspected: 'Suspected endometriosis',
   undiagnosed: 'Not yet diagnosed',
@@ -66,7 +66,7 @@ export function buildReportPdf(report: SharedReport): Blob {
 
   write('PATIENT-REPORTED SYMPTOM SUMMARY', 8.5, { bold: true, color: 120, gap: 2 })
   write('Longitudinal symptom summary', 20, { bold: true, gap: 4 })
-  write([report.patient.displayName, STATUS[report.patient.diagnosisStatus]].filter(Boolean).join(' · '), 10.5, { color: 80 })
+  write([report.patient.displayName, report.patient.diagnosisStatus && STATUS[report.patient.diagnosisStatus]].filter(Boolean).join(' · '), 10.5, { color: 80 })
   write(
     `${formatDateLong(p.start)} - ${formatDateLong(p.end)} · ${p.loggedDays} of ${p.calendarDays} days logged (${coverage}%) · ${p.completeCycles} complete cycle${p.completeCycles === 1 ? '' : 's'}`,
     9.5,
@@ -83,9 +83,20 @@ export function buildReportPdf(report: SharedReport): Blob {
     if (report.patient.priorLabels?.length) write(`Previous labels: ${report.patient.priorLabels.join('; ')}`, 10, { color: 80 })
   }
 
+  if (report.summary?.length) {
+    heading('Summary in plain words')
+    write(report.summary.join(' '), 11, { gap: 2 })
+    write('Written by an AI from the findings below. Every number in it was checked against the patient’s entries.', 9, { color: 110 })
+  }
+
   for (const s of report.sections) {
     heading(s.title)
     for (const c of s.claims) write(c.text, 11, { gap: 5 })
+  }
+
+  if (report.background?.length) {
+    heading('Background')
+    for (const l of report.background) write(`${l.label}: ${l.value}`, 10.5, { gap: 2 })
   }
 
   if (report.treatments?.length) {

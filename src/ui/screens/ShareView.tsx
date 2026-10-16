@@ -1,12 +1,14 @@
 /**
  * ShareView — /s/:token, the page a clinician opens. No account needed.
  *
- * It can show exactly one thing: the snapshot the patient approved. The token is
- * checked server-side by view_shared_report(), which cannot reach any other data.
- * Revoked, expired and never-existed links are indistinguishable by design.
+ * It can show exactly one thing: the snapshot the patient approved. The link
+ * alone opens nothing: the clinician enters the 6-digit access code the patient
+ * gave them separately, and view_shared_report() checks both server-side. A
+ * wrong code, a revoked, expired or locked link, and one that never existed are
+ * indistinguishable by design; five wrong codes lock the link.
  */
 
-import { useEffect, useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../data/supabase'
 import { SharedReportView } from '../share/SharedReportView'
@@ -14,47 +16,32 @@ import type { SharedReport } from '../share/snapshot'
 import { Wordmark } from './auth/AuthLayout'
 
 type State =
+  | { kind: 'code'; failed: boolean }
   | { kind: 'loading' }
   | { kind: 'ok'; report: SharedReport; expiresAt: string }
-  | { kind: 'gone' }
   | { kind: 'offline' }
 
-/**
- * Each fetch counts as a view and is written to the patient's audit log, so two
- * concurrent fetches of one page load (React StrictMode runs effects twice in
- * development) would inflate the "viewed N times" the patient sees. Concurrent
- * requests for the same token share one call.
- */
-const inflight = new Map<string, Promise<State>>()
-
-function fetchReport(token: string): Promise<State> {
-  const existing = inflight.get(token)
-  if (existing) return existing
-  const request = (async (): Promise<State> => {
-    if (!supabase) return { kind: 'gone' }
-    const { data, error } = await supabase.rpc('view_shared_report', { p_token: token })
-    if (error) return { kind: 'offline' }
-    if (!data) return { kind: 'gone' }
-    return { kind: 'ok', report: data.snapshot as SharedReport, expiresAt: data.expires_at as string }
-  })()
-  inflight.set(token, request)
-  void request.finally(() => setTimeout(() => inflight.delete(token), 1000))
-  return request
+async function fetchReport(token: string, code: string): Promise<State> {
+  if (!supabase) return { kind: 'code', failed: true }
+  const { data, error } = await supabase.rpc('view_shared_report', { p_token: token, p_code: code })
+  if (error) return { kind: 'offline' }
+  if (!data) return { kind: 'code', failed: true }
+  return { kind: 'ok', report: data.snapshot as SharedReport, expiresAt: data.expires_at as string }
 }
 
 export default function ShareView() {
   const { token = '' } = useParams()
-  const [state, setState] = useState<State>({ kind: 'loading' })
+  const [state, setState] = useState<State>({ kind: 'code', failed: false })
+  const [code, setCode] = useState('')
 
-  useEffect(() => {
-    let active = true
-    void fetchReport(token).then((next) => {
-      if (active) setState(next)
-    })
-    return () => {
-      active = false
-    }
-  }, [token])
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (code.length !== 6) return
+    setState({ kind: 'loading' })
+    const next = await fetchReport(token, code)
+    if (next.kind === 'code') setCode('')
+    setState(next)
+  }
 
   return (
     <div className="safe-top mx-auto w-full max-w-3xl px-5 pb-16 pt-8 print-full">
@@ -67,16 +54,26 @@ export default function ShareView() {
         )}
       </div>
 
-      {state.kind === 'loading' && (
-        <p className="text-center text-[14px]" style={{ color: 'var(--ink-muted)' }}>Loading report…</p>
-      )}
-      {state.kind === 'gone' && (
-        <div className="card p-6 text-center">
-          <h1 style={{ fontSize: 22 }}>This report is no longer available</h1>
+      {(state.kind === 'code' || state.kind === 'loading') && (
+        <form className="card mx-auto max-w-md p-6" onSubmit={(e) => void submit(e)}>
+          <h1 style={{ fontSize: 22 }}>Enter the access code</h1>
           <p className="mt-2 text-[14px]" style={{ color: 'var(--ink-secondary)' }}>
-            The link may have expired or been withdrawn by the patient. Ask them to share a new one.
+            The patient will have given you a 6-digit code separately from this link.
           </p>
-        </div>
+          <input className="input mt-4 text-center font-mono text-[22px] tracking-[0.3em]" inputMode="numeric"
+            autoComplete="one-time-code" maxLength={6} aria-label="Access code" value={code} autoFocus
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
+          {state.kind === 'code' && state.failed && (
+            <p className="notice notice-error mt-3">
+              That didn’t work. Check the code and try again. The link may also have expired, been withdrawn, or been
+              locked after too many wrong codes; if so, ask the patient for a new one.
+            </p>
+          )}
+          <button type="submit" className="btn btn-primary focus-ring mt-4 w-full" style={{ minHeight: 42 }}
+            disabled={code.length !== 6 || state.kind === 'loading'}>
+            {state.kind === 'loading' ? 'Opening…' : 'Open report'}
+          </button>
+        </form>
       )}
       {state.kind === 'offline' && (
         <div className="card p-6 text-center">

@@ -16,6 +16,7 @@ import type {
   ClinicalEvent,
   ClinicalEventKind,
   DayRecord,
+  HealthBackground,
   ImpactLevel,
   MedicationEntry,
   PatientProfile,
@@ -98,6 +99,18 @@ export interface ProfileRow {
   usual_cycle_max: number | null
   cycle_regularity: PatientProfile['cycleRegularity'] | null
   age_at_menarche: number | null
+  health_conditions?: string[]
+  typical_bleeding_days?: number | null
+  heavy_bleeding?: HealthBackground['heavyBleeding'] | null
+  spotting_between_periods?: HealthBackground['spottingBetweenPeriods'] | null
+  last_period_start?: string | null
+  hormonal_contraception?: HealthBackground['hormonalContraception'] | null
+  treatment_amenorrhoea?: boolean | null
+  pregnancy_history?: HealthBackground['pregnancyHistory'] | null
+  pregnancy_possible?: HealthBackground['pregnancyPossible'] | null
+  fertility_concerns?: HealthBackground['fertilityConcerns'] | null
+  reproductive_goals?: HealthBackground['reproductiveGoals'] | null
+  fertility_treatment?: HealthBackground['fertilityTreatment'] | null
   enabled_domains: SymptomDomain[]
   tracked_symptom_ids: string[]
   reminder: 'daily' | 'period' | 'none'
@@ -263,8 +276,29 @@ export function rowToProfile(row: ProfileRow, displayNameFallback: string): Pati
         : undefined,
     cycleRegularity: row.cycle_regularity ?? undefined,
     ageAtMenarche: row.age_at_menarche ?? undefined,
+    background: rowToBackground(row),
     enabledDomains: row.enabled_domains,
   }
+}
+
+/** Only answered questions appear; an unanswered one stays absent rather than becoming "no". */
+export function rowToBackground(row: ProfileRow): HealthBackground | undefined {
+  const b: HealthBackground = {
+    healthConditions: row.health_conditions?.length ? row.health_conditions : undefined,
+    typicalBleedingDays: row.typical_bleeding_days ?? undefined,
+    heavyBleeding: row.heavy_bleeding ?? undefined,
+    spottingBetweenPeriods: row.spotting_between_periods ?? undefined,
+    lastPeriodStart: row.last_period_start ?? undefined,
+    hormonalContraception: row.hormonal_contraception ?? undefined,
+    treatmentAmenorrhoea: row.treatment_amenorrhoea ?? undefined,
+    pregnancyHistory: row.pregnancy_history ?? undefined,
+    pregnancyPossible: row.pregnancy_possible ?? undefined,
+    fertilityConcerns: row.fertility_concerns ?? undefined,
+    reproductiveGoals: row.reproductive_goals ?? undefined,
+    fertilityTreatment: row.fertility_treatment ?? undefined,
+  }
+  for (const k of Object.keys(b) as (keyof HealthBackground)[]) if (b[k] === undefined) delete b[k]
+  return Object.keys(b).length > 0 ? b : undefined
 }
 
 /** Patient-defined symptom keys are namespaced so they can never collide with the vocabulary. */

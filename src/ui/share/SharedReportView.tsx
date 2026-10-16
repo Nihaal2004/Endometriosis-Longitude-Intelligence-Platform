@@ -8,8 +8,9 @@
 
 import { formatDateLong } from '../../engine/brief'
 import type { SharedReport } from './snapshot'
+import { BACKGROUND_GROUP_TITLES, type BackgroundLine } from './background'
 
-const STATUS: Record<SharedReport['patient']['diagnosisStatus'], string> = {
+const STATUS: Record<NonNullable<SharedReport['patient']['diagnosisStatus']>, string> = {
   confirmed: 'Endometriosis confirmed',
   suspected: 'Suspected endometriosis',
   undiagnosed: 'Not yet diagnosed',
@@ -27,7 +28,10 @@ export function SharedReportView({ report, expiresAt }: { report: SharedReport; 
         </p>
         <h1 className="mt-1" style={{ fontSize: 26 }}>Longitudinal symptom summary</h1>
         <p className="mt-1.5 text-[13.5px]" style={{ color: 'var(--ink-secondary)' }}>
-          {[report.patient.displayName, STATUS[report.patient.diagnosisStatus]].filter(Boolean).join(' · ')}
+          {[
+            report.patient.displayName ?? 'Name withheld by the patient',
+            report.patient.diagnosisStatus && STATUS[report.patient.diagnosisStatus],
+          ].filter(Boolean).join(' · ')}
         </p>
         <p className="mt-1 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
           {formatDateLong(p.start)} – {formatDateLong(p.end)} · {p.loggedDays} of {p.calendarDays} days logged ({coverage}%)
@@ -54,6 +58,15 @@ export function SharedReportView({ report, expiresAt }: { report: SharedReport; 
         </Block>
       )}
 
+      {report.summary && report.summary.length > 0 && (
+        <Block title="Summary in plain words">
+          <p className="text-[14.5px] leading-relaxed">{report.summary.join(' ')}</p>
+          <p className="mt-1.5 text-[11.5px]" style={{ color: 'var(--ink-muted)' }}>
+            Written by an AI from the findings below. Every number in it was checked against the patient’s entries.
+          </p>
+        </Block>
+      )}
+
       {report.sections.map((s) => (
         <Block key={s.id} title={s.title}>
           <div className="space-y-2.5">
@@ -63,6 +76,12 @@ export function SharedReportView({ report, expiresAt }: { report: SharedReport; 
           </div>
         </Block>
       ))}
+
+      {report.background && report.background.length > 0 && (
+        <Block title="Background">
+          <BackgroundList lines={report.background} />
+        </Block>
+      )}
 
       {report.treatments && report.treatments.length > 0 && (
         <Block title="Treatments">
@@ -105,6 +124,28 @@ export function SharedReportView({ report, expiresAt }: { report: SharedReport; 
         {expiresAt && ` This link expires on ${formatDateLong(expiresAt.slice(0, 10))}.`}
       </p>
     </article>
+  )
+}
+
+/** Patient-reported baseline, grouped. Shared with the report screen and its PDF. */
+export function BackgroundList({ lines }: { lines: BackgroundLine[] }) {
+  const groups = (['history', 'menstrual', 'fertility'] as const).filter((g) => lines.some((l) => l.group === g))
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {groups.map((g) => (
+        <div key={g}>
+          <p className="mb-1 text-[12.5px] font-semibold" style={{ color: 'var(--ink)' }}>{BACKGROUND_GROUP_TITLES[g]}</p>
+          <dl className="space-y-0.5 text-[13px]">
+            {lines.filter((l) => l.group === g).map((l) => (
+              <div key={l.label} className="flex justify-between gap-3">
+                <dt style={{ color: 'var(--ink-secondary)' }}>{l.label}</dt>
+                <dd className="text-right" style={{ color: 'var(--ink)' }}>{l.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </div>
   )
 }
 

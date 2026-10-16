@@ -24,7 +24,7 @@
  */
 
 import { summariseCycles } from './cycles'
-import { summariseImpact, summariseMedication, type FeatureContext } from './features'
+import { AREA_KEY_PREFIX, summariseImpact, summariseMedication, type FeatureContext } from './features'
 import { clinicalLabel } from './symptoms'
 import type { BriefSection, Claim, ConsultationBrief, Finding, PatternKind } from './types'
 
@@ -264,6 +264,67 @@ function renderFunctionalBurden(f: Finding): Claim {
   }, f.evidenceDates)
 }
 
+/** How the report names each stored impact area. */
+export const IMPACT_AREA_LABELS: Record<string, string> = {
+  work: 'work',
+  education: 'studies',
+  exercise: 'exercise',
+  walking: 'walking or getting around',
+  sleep: 'sleep',
+  household: 'household tasks',
+  social: 'social life',
+  concentration: 'concentration',
+  mood: 'mood',
+  'sexual activity': 'sexual activity',
+}
+
+/**
+ * Which parts of life symptoms got in the way of. Impact is the outcome this app is
+ * built around, so the areas get their own checked sentence. Sexual activity is a
+ * separate claim, tied to the sexual-health module, so a share link leaves it out
+ * unless that module is included.
+ */
+function renderImpactAreas(ctx: FeatureContext): Claim[] {
+  const { domainCounts } = summariseImpact(ctx)
+  const datesFor = (key: string) =>
+    ctx.orderedDates.filter((d) => {
+      const day = ctx.daysByDate.get(d)
+      return day?.logged && day.impact !== undefined && (day.impactDomains ?? []).includes(key)
+    })
+  const name = (key: string) => IMPACT_AREA_LABELS[key] ?? key.toLowerCase()
+  const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
+  const out: Claim[] = []
+
+  const top = Object.entries(domainCounts)
+    .filter(([k, n]) => k !== 'sexual activity' && n > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+  if (top.length > 0) {
+    const parts = top.map(([k, n]) => `${name(k)} (${days(n)})`)
+    const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+    out.push(claim(
+      'impact_areas',
+      'impact',
+      `The ${top.length === 1 ? 'area of life' : 'areas of life'} symptoms most often got in the way of ` +
+        `${top.length === 1 ? 'was' : 'were'} ${list}.`,
+      Object.fromEntries(top.map(([k, n]) => [`${AREA_KEY_PREFIX}${k}`, n])),
+      [...new Set(top.flatMap(([k]) => datesFor(k)))].sort(),
+    ))
+  }
+
+  const sexual = domainCounts['sexual activity'] ?? 0
+  if (sexual > 0) {
+    out.push(claim(
+      'impact_sexual:dyspareunia',
+      'impact',
+      `Symptoms got in the way of sexual activity on ${days(sexual)}.`,
+      { [`${AREA_KEY_PREFIX}sexual activity`]: sexual },
+      datesFor('sexual activity'),
+    ))
+  }
+  return out
+}
+
 // ---------------------------------------------------------------------------
 // Brief assembly
 // ---------------------------------------------------------------------------
@@ -364,6 +425,8 @@ export function generateBrief(
       reported++
     }
   }
+
+  claims.push(...renderImpactAreas(ctx))
 
   // --- Medication ------------------------------------------------------------
   const meds = summariseMedication(ctx)

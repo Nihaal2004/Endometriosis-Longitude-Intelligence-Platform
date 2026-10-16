@@ -4,6 +4,7 @@
  * Real patient data does NOT live here. It lives in the on-device database behind
  * src/data/repository.ts and reaches screens through DataProvider. This store
  * holds only what is safe to keep in plain localStorage: theme, window length,
+ * quick or detailed logging,
  * which demo persona is open, and edits made while exploring the demo.
  */
 
@@ -17,6 +18,7 @@ import { runPatternEngine, type PatternResult } from '../engine/patterns'
 import type { Claim, ConsultationBrief, DayRecord, PatientRecord } from '../engine/types'
 
 export type ScreenTheme = 'light' | 'dark' | 'system'
+export type LogMode = 'quick' | 'detailed'
 
 interface AppState {
   /** Non-null while exploring a demo patient without an account. */
@@ -26,6 +28,8 @@ interface AppState {
   demoRevision: number
   theme: ScreenTheme
   windowDays: number
+  /** Quick asks bleeding, pain, symptoms and a note; detailed adds severity, impact and medication. */
+  logMode: LogMode
 
   enterDemo: (personaId: string) => void
   exitDemo: () => void
@@ -33,6 +37,7 @@ interface AppState {
   saveDemoDay: (day: DayRecord) => void
   clearDemoDay: (date: string) => void
   setTheme: (theme: ScreenTheme) => void
+  setLogMode: (logMode: LogMode) => void
 }
 
 export const useApp = create<AppState>()(
@@ -43,6 +48,7 @@ export const useApp = create<AppState>()(
       demoRevision: 0,
       theme: 'system',
       windowDays: 92,
+      logMode: 'quick',
 
       enterDemo: (demoPersonaId) => set({ demoPersonaId }),
       exitDemo: () => set({ demoPersonaId: null }),
@@ -70,6 +76,7 @@ export const useApp = create<AppState>()(
         }),
 
       setTheme: (theme) => set({ theme }),
+      setLogMode: (logMode) => set({ logMode }),
     }),
     {
       name: 'medtrace-ui',
@@ -78,6 +85,7 @@ export const useApp = create<AppState>()(
         demoEdits: s.demoEdits,
         theme: s.theme,
         windowDays: s.windowDays,
+        logMode: s.logMode,
       }),
     },
   ),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildShareSnapshot, SHARE_SECTIONS, type ShareSectionId } from './snapshot'
+import { buildShareSnapshot, DEFAULT_PRIVACY, SHARE_SECTIONS, type ShareSectionId } from './snapshot'
 import type { Claim, PatientRecord } from '../../engine/types'
 
 const claim = (id: string, section: Claim['section'], text: string, verified = true): Claim => ({
@@ -74,4 +74,67 @@ describe('share snapshot', () => {
     const r = buildShareSnapshot({ claims, record, window, concerns: [], selected: defaults })
     expect(r.patient.displayName).toBeUndefined()
   })
+
+  const named: PatientRecord = { ...record, profile: { ...record.profile, displayName: 'Veditha', priorLabels: ['IBS'] } }
+
+  it('withholds the name by default, and includes it only when chosen', () => {
+    const hidden = buildShareSnapshot({ claims, record: named, window, concerns: [], selected: defaults })
+    expect(hidden.patient.displayName).toBeUndefined()
+    expect(JSON.stringify(hidden)).not.toContain('Veditha')
+    const shown = buildShareSnapshot({
+      claims, record: named, window, concerns: [], selected: defaults, privacy: { ...DEFAULT_PRIVACY, name: true },
+    })
+    expect(shown.patient.displayName).toBe('Veditha')
+  })
+
+  it('can leave out the diagnosis status and earlier diagnoses', () => {
+    const r = buildShareSnapshot({
+      claims, record: named, window, concerns: [], selected: defaults, privacy: { ...DEFAULT_PRIVACY, diagnosis: false },
+    })
+    expect(r.patient.diagnosisStatus).toBeUndefined()
+    expect(r.patient.priorLabels).toBeUndefined()
+    expect(JSON.stringify(r)).not.toContain('IBS')
+  })
+
+  const withBackground: PatientRecord = {
+    ...record,
+    profile: {
+      ...record.profile,
+      ageAtMenarche: 12,
+      background: { heavyBleeding: 'yes', typicalBleedingDays: 6, fertilityConcerns: 'yes', reproductiveGoals: 'trying' },
+    },
+  }
+
+  it('includes menstrual history by default but never fertility unless chosen', () => {
+    const r = buildShareSnapshot({ claims, record: withBackground, window, concerns: [], selected: defaults })
+    const labels = r.background?.map((l) => l.label) ?? []
+    expect(labels).toContain('Heavy periods')
+    expect(labels).toContain('First period at age')
+    expect(r.background?.some((l) => l.group === 'fertility')).toBe(false)
+    const withFertility = buildShareSnapshot({
+      claims, record: withBackground, window, concerns: [], selected: defaults, privacy: { ...DEFAULT_PRIVACY, fertility: true },
+    })
+    expect(withFertility.background?.find((l) => l.label === 'Plans for pregnancy')?.value).toBe('Trying to conceive')
+  })
+
+  it('can leave the whole background out', () => {
+    const r = buildShareSnapshot({
+      claims, record: withBackground, window, concerns: [], selected: defaults, privacy: { ...DEFAULT_PRIVACY, background: false },
+    })
+    expect(r.background).toBeUndefined()
+  })
+
+  it('shares an AI summary only of claims the link includes, and only when ticked', () => {
+    const summary = {
+      functional_burden: 'Symptoms limited 20 days.',
+      'cyclicity:dyspareunia': 'Dyspareunia on 6 days.',
+    }
+    const r = buildShareSnapshot({ claims, record, window, concerns: [], selected: defaults, summary })
+    expect(r.summary?.join(' ')).toContain('Symptoms limited 20 days.')
+    expect(r.summary?.join(' ')).not.toContain('Dyspareunia')
+    const off = new Set(defaults)
+    off.delete('summary')
+    expect(buildShareSnapshot({ claims, record, window, concerns: [], selected: off, summary }).summary).toBeUndefined()
+  })
 })
+

@@ -315,6 +315,9 @@ export interface ImpactSummary {
   domainCounts: Record<string, number>
 }
 
+/** Impact-area counts are asserted as `area:<key>`: logged days with an impact answer naming the area. */
+export const AREA_KEY_PREFIX = 'area:'
+
 export function summariseImpact(ctx: FeatureContext): ImpactSummary {
   const byLevel: Record<ImpactLevel, number> = {
     [ImpactLevel.None]: 0,

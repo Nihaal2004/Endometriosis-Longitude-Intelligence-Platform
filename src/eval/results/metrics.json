@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T19:43:29.816Z",
+  "generatedAt": "2026-10-16T11:55:37.892Z",
   "engineVersion": "0.1.0",
   "gate": {
     "minCoverage": 0.6,
@@ -495,12 +495,12 @@
   ],
   "fidelity": {
     "briefsGenerated": 30,
-    "totalClaims": 226,
-    "verifiedClaims": 226,
+    "totalClaims": 256,
+    "verifiedClaims": 256,
     "verificationRate": 1,
-    "keyCoverage": 0.5954415954415955,
-    "mutationsInjected": 194,
-    "mutationsCaught": 194,
+    "keyCoverage": 0.7660256410256411,
+    "mutationsInjected": 224,
+    "mutationsCaught": 224,
     "mutationCatchRate": 1
   },
   "burden": {
@@ -524,15 +524,15 @@
   "latency": {
     "runs": 40,
     "recordDays": 180,
-    "p50Ms": 92.31814999999915,
-    "p95Ms": 110.32098499998973,
-    "maxMs": 114.6359999999986,
-    "meanMs": 93.77254750000102,
+    "p50Ms": 85.91970000000583,
+    "p95Ms": 102.83559000000241,
+    "maxMs": 112.49740000000747,
+    "meanMs": 86.56558000000041,
     "stageBreakdownMs": {
-      "features": 0.880352500000663,
-      "patterns": 88.37817499999946,
-      "brief": 0.15410999999949127,
-      "fidelity": 4.359910000001401
+      "features": 0.8515800000008312,
+      "patterns": 80.43190500000055,
+      "brief": 0.32906249999832654,
+      "fidelity": 4.9530325000007
     }
   }
 }

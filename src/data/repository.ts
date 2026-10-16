@@ -364,6 +364,18 @@ export class Repository {
     this.afterWrite()
   }
 
+  // A share link's token and access code exist on the server only as hashes. The
+  // patient's own copy is kept here, on this device only, so she can open or
+  // resend a live link later. It never syncs and goes when she signs out.
+  async saveShareKey(grantId: string, key: { url: string; code: string }): Promise<void> {
+    await this.db.meta.put({ key: `share:${grantId}`, value: JSON.stringify(key) })
+  }
+
+  async getShareKeys(): Promise<Record<string, { url: string; code: string }>> {
+    const rows = await this.db.meta.where('key').startsWith('share:').toArray()
+    return Object.fromEntries(rows.map((r) => [r.key.slice('share:'.length), JSON.parse(r.value)]))
+  }
+
   async audit(action: string, target?: string): Promise<void> {
     await this.enqueueLog('audit_events', { actor: 'patient', action, target: target ?? null })
     this.scheduleFlush()

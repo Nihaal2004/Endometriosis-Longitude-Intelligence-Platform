@@ -18,6 +18,7 @@ import {
   mutateClaim,
   verifyBrief,
   verifyPolishedText,
+  verifySummarySentence,
 } from './fidelity'
 import { runPatternEngine } from './patterns'
 import { createRandom } from './rng'
@@ -171,8 +172,9 @@ describe('brief generation', () => {
       persistenceFloor: 0.2,
       kappaFloor: 0.21,
     })
+    // Impact-area sentences summarise the record, like the medication line; they are not pattern findings.
     const findingClaims = capped.claims.filter(
-      (c) => c.section === 'findings' || c.section === 'change' || c.section === 'impact',
+      (c) => (c.section === 'findings' || c.section === 'change' || c.section === 'impact') && !c.findingId.startsWith('impact_'),
     )
     expect(findingClaims.length).toBeLessThanOrEqual(2)
   })
@@ -377,5 +379,89 @@ describe('numeric-token gate for rewritten prose', () => {
 
   it('extracts decimals and negatives', () => {
     expect(extractNumbers('RR 9.8 (95% CI 3.9–24.6), slope −0.12')).toEqual([9.8, 95, 3.9, 24.6, 0.12])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Impact areas: the outcome the app is built around, checked like every number
+// ---------------------------------------------------------------------------
+
+describe('impact areas in the brief', () => {
+  const record = buildPatient()
+  const { brief } = buildBrief(record)
+  const areas = brief.claims.find((c) => c.findingId === 'impact_areas')
+
+  it('names the areas of life most often affected, with day counts', () => {
+    expect(areas).toBeDefined()
+    expect(areas!.section).toBe('impact')
+    const keys = Object.keys(areas!.assertedValues)
+    expect(keys.length).toBeGreaterThan(0)
+    expect(keys.length).toBeLessThanOrEqual(3)
+    expect(keys.every((k) => k.startsWith('area:'))).toBe(true)
+    for (const n of Object.values(areas!.assertedValues)) expect(areas!.text).toContain(String(n))
+  })
+
+  it('every area count is re-derived from the raw days and passes', () => {
+    const report = verifyBrief(brief.claims, record, brief.windowStart, brief.windowEnd)
+    const result = report.results.find((r) => r.claimId === areas!.id)
+    expect(result?.verified).toBe(true)
+    expect(result?.checkedKeys.length).toBe(Object.keys(areas!.assertedValues).length)
+  })
+
+  it('a corrupted area count is caught', () => {
+    const key = Object.keys(areas!.assertedValues)[0]
+    const bad = { ...areas!, assertedValues: { ...areas!.assertedValues, [key]: areas!.assertedValues[key] + 2 } }
+    const report = verifyBrief([bad], record, brief.windowStart, brief.windowEnd)
+    expect(report.results[0].verified).toBe(false)
+  })
+
+  it('keeps sexual activity in its own claim, tied to the sexual-health module', () => {
+    const withSexual: PatientRecord = {
+      ...record,
+      days: record.days.map((d) => (d.impactDomains?.length ? { ...d, impactDomains: [...d.impactDomains, 'sexual activity'] } : d)),
+    }
+    const { brief: b } = buildBrief(withSexual)
+    const main = b.claims.find((c) => c.findingId === 'impact_areas')
+    const sexual = b.claims.find((c) => c.findingId.startsWith('impact_sexual'))
+    expect(main?.text).not.toContain('sexual')
+    expect(sexual?.text).toContain('sexual activity')
+    const report = verifyBrief(b.claims, withSexual, b.windowStart, b.windowEnd)
+    expect(report.results.find((r) => r.claimId === sexual!.id)?.verified).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The AI summary gate: stricter than the numeric gate
+// ---------------------------------------------------------------------------
+
+describe('summary sentence gate', () => {
+  const claim = {
+    id: 'c1',
+    findingId: 'cyclicity:painful_bm',
+    section: 'findings' as const,
+    text: 'Dyschezia was recorded on 9 of 11 observed perimenstrual days (82%).',
+    assertedValues: { menstrualPresent: 9, menstrualObserved: 11, menstrualRatePct: 82 },
+    evidenceDates: [],
+  }
+
+  it('accepts a plain rewording that keeps the numbers', () => {
+    expect(verifySummarySentence(claim, 'Painful bowel movements on 9 of 11 days around her period (82%).')).toBe(true)
+  })
+
+  it('rejects an amount written as a word, which the numeric gate cannot see', () => {
+    expect(verifySummarySentence(claim, 'Painful bowel movements on nine of eleven days around her period.')).toBe(false)
+  })
+
+  it('rejects an added quantifier that overstates the record', () => {
+    expect(verifySummarySentence(claim, 'Painful bowel movements happen during all of her periods.')).toBe(false)
+  })
+
+  it('rejects a diagnosis the original did not contain', () => {
+    expect(verifySummarySentence(claim, 'Dyschezia on 9 of 11 days (82%), typical of endometriosis.')).toBe(false)
+  })
+
+  it('rejects a changed number and an empty rewrite', () => {
+    expect(verifySummarySentence(claim, 'Dyschezia on 10 of 11 days.')).toBe(false)
+    expect(verifySummarySentence(claim, '  ')).toBe(false)
   })
 })

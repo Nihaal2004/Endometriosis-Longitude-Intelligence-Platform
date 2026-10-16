@@ -31,7 +31,7 @@ npm run dev          # register; confirmation emails arrive in Mailpit, http://1
 
 ```bash
 ollama pull medgemma:4b                         # ~3 GB, once
-npx supabase functions serve interpret-symptom  # reaches Ollama at host.docker.internal:11434
+npx supabase functions serve                    # the three AI functions; reach Ollama at host.docker.internal:11434
 ```
 
 Any OpenAI-compatible endpoint works: set `LLM_BASE_URL`, `LLM_MODEL` and, if needed, `LLM_API_KEY` as function secrets. A hosted provider receives patients' words, so update the privacy notice first.
@@ -39,9 +39,10 @@ Any OpenAI-compatible endpoint works: set `LLM_BASE_URL`, `LLM_MODEL` and, if ne
 **Checks:**
 
 ```bash
-npm test             # 179 unit tests: statistics, engine, data layer, check-in rules, sharing, medical-term validation
-npm run test:db      # 46 pgTAP tests: row-level security, history, sharing, erasure
-npm run e2e          # end-to-end account flow (28 checks) + phone layout (16 checks)
+npm test             # 199 unit tests: statistics, engine, data layer, check-in rules, sharing, AI-answer validation and gates
+npm run test:db      # 54 pgTAP tests: row-level security, history, sharing and access codes, health background, erasure
+npm run e2e          # end-to-end account flow (32 checks) + phone layout (16 checks)
+npm run e2e:ai       # AI features end to end (14 checks; needs functions serve + MedGemma)
 npm run eval         # regenerate the engine evaluation metrics (~60s)
 ```
 
@@ -83,7 +84,7 @@ Three properties do the work:
 
 **One question, one named test.** Fisher's exact for cyclicity, Rayleigh on circular phase as a cross-check, Mann–Kendall with Theil–Sen for trend, Cohen's κ with a permutation null for co-occurrence, exact conditional Poisson for baseline change — all corrected by Benjamini–Hochberg within family, then gated on coverage, cycles and event count. Non-parametric throughout, because the data is ordinal, small-n and zero-inflated.
 
-**No number is written by a language model.** Sentences are templated; numeric slots come from computed findings. A fidelity checker then re-derives every asserted number from the raw records through a *separately written* implementation and drops any claim that disagrees. In evaluation it caught 194 of 194 deliberately injected errors.
+**No number is written by a language model.** Sentences are templated; numeric slots come from computed findings. A fidelity checker then re-derives every asserted number from the raw records through a *separately written* implementation and drops any claim that disagrees. In evaluation it caught 224 of 224 deliberately injected errors.
 
 ## Documentation
 

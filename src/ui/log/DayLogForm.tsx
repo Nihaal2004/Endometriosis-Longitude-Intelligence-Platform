@@ -5,18 +5,22 @@
  * whatever the day already holds, and all save rules live in dayLog.ts (pure,
  * tested), so this file is only presentation.
  *
- * Deliberately light: bleeding, pain, symptom chips, impact, medication. Severity
- * per symptom, the impact follow-up and notes appear only when relevant.
+ * Two modes, remembered per device. Quick: bleeding, pain, symptom chips and a
+ * note. Detailed adds severity per symptom, impact and medication. A question
+ * quick mode skips is saved as unknown, never as "no", and anything a day already
+ * holds is kept when it is re-saved in quick mode. The note box is always open.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { planDailyQuestions } from '../../engine/adaptive'
 import { clinicalLabel, getSymptom, symptomLabel, SYMPTOMS } from '../../engine/symptoms'
 import type { FeatureContext } from '../../engine/features'
 import { BLEEDING_LEVELS, ImpactLevel, type BleedingLevel, type DayRecord } from '../../engine/types'
 import { interpretSymptom, type CatalogEntry, type Interpretation } from '../../data/interpret'
+import { interpretDay, type DayInterpretation } from '../../data/aiAssist'
 import { isFutureDate } from '../../lib/dates'
 import { useData } from '../data'
+import { useApp, type LogMode } from '../store'
 import { buildDayRecord, draftFromDay, PRIMARY_PAIN, type DayLogDraft } from './dayLog'
 
 const BLEED_LABEL: Record<BleedingLevel, string> = {
@@ -35,7 +39,19 @@ const IMPACT_CHOICES: { level: ImpactLevel; label: string }[] = [
   { level: ImpactLevel.CouldNotPerform, label: 'Couldn’t do something important' },
 ]
 
-const IMPACT_DOMAINS = ['Work', 'Education', 'Exercise', 'Sleep', 'Household', 'Social', 'Concentration', 'Mood']
+/** What a bad day got in the way of. Keys are stored; sexual activity is offered only with that module on. */
+export const IMPACT_DOMAINS: { key: string; label: string; sensitive?: boolean }[] = [
+  { key: 'work', label: 'Work' },
+  { key: 'education', label: 'Education' },
+  { key: 'exercise', label: 'Exercise' },
+  { key: 'walking', label: 'Walking / getting around' },
+  { key: 'sleep', label: 'Sleep' },
+  { key: 'household', label: 'Household' },
+  { key: 'social', label: 'Social' },
+  { key: 'concentration', label: 'Concentration' },
+  { key: 'mood', label: 'Mood' },
+  { key: 'sexual activity', label: 'Sexual activity', sensitive: true },
+]
 const DEFAULT_MEDS = ['Ibuprofen', 'Paracetamol', 'Mefenamic acid']
 
 export function DayLogForm({
@@ -70,13 +86,19 @@ export function DayLogForm({
 
   const [draft, setDraft] = useState<DayLogDraft>(() => draftFromDay(existing, shownIds))
   const [showMore, setShowMore] = useState(false)
-  const [showRate, setShowRate] = useState(false)
-  const [showNote, setShowNote] = useState(Boolean(existing?.note))
   const [customLabel, setCustomLabel] = useState('')
   const [interpreting, setInterpreting] = useState(false)
   const [suggestion, setSuggestion] = useState<{ label: string; result: Interpretation } | null>(null)
+  const [reading, setReading] = useState(false)
+  const [understood, setUnderstood] = useState<DayInterpretation | null>(null)
+  const [readFailed, setReadFailed] = useState(false)
+  const [filled, setFilled] = useState(false)
+  const top = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [confirmClear, setConfirmClear] = useState(false)
+  const logMode = useApp((s) => s.logMode)
+  const setLogMode = useApp((s) => s.setLogMode)
+  const detailed = logMode === 'detailed'
 
   const future = isFutureDate(date, today)
   const update = (patch: Partial<DayLogDraft>) => {
@@ -180,8 +202,71 @@ export function DayLogForm({
     ]),
   ].slice(0, 8)
 
+  const areaOptions = IMPACT_DOMAINS.filter((d) => !d.sensitive || record.profile.enabledDomains.includes('sexual'))
+
+  /** Ask the AI to read the note; nothing changes until she taps "Fill it in". */
+  async function readNote() {
+    setReading(true)
+    setReadFailed(false)
+    setFilled(false)
+    const result = await interpretDay(draft.note, catalog, medOptions, areaOptions.map((a) => a.key))
+    setReading(false)
+    setUnderstood(result)
+    setReadFailed(result === null)
+  }
+
+  /** Fill only what the AI found; everything else stays as she left it. Never saves. */
+  function fillFromNote(r: DayInterpretation) {
+    setDraft((d) => {
+      const selected = new Set(d.selected)
+      const cleared = new Set(d.explicitlyCleared)
+      for (const id of r.symptomIds) {
+        selected.add(id)
+        cleared.delete(id)
+      }
+      return {
+        ...d,
+        bleeding: r.bleeding ?? d.bleeding,
+        pain: r.pain ?? d.pain,
+        selected,
+        explicitlyCleared: cleared,
+        impact: r.impact ?? d.impact,
+        impactDomains: r.areas.length > 0 ? r.areas : d.impactDomains,
+        medications: [...new Set([...d.medications, ...r.medications])],
+      }
+    })
+    // Impact and medication only show in Detailed, and she should see what will be saved.
+    if (r.impact !== null || r.medications.length > 0) setLogMode('detailed')
+    setUnderstood(null)
+    setFilled(true)
+    setStatus('idle')
+    top.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
-    <div>
+    <div ref={top}>
+      {filled && (
+        <p className="notice notice-info mb-5" role="status">
+          Filled in from your note. Check everything below, change anything that’s wrong, then save.
+        </p>
+      )}
+      {/* Mode */}
+      <div className="mb-6">
+        <div className="segmented" role="tablist" aria-label="How much to log">
+          {(['quick', 'detailed'] as LogMode[]).map((m) => (
+            <button key={m} type="button" role="tab" aria-selected={logMode === m} className="focus-ring"
+              onClick={() => setLogMode(m)}>
+              {m === 'quick' ? 'Quick' : 'Detailed'}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+          {detailed
+            ? 'Also asks how bad each symptom was, what it got in the way of, and any medication.'
+            : 'Just the basics, about 20 seconds. Switch to Detailed any time for more.'}
+        </p>
+      </div>
+
       {/* Bleeding */}
       <Section label="Bleeding">
         <div className="flex flex-wrap gap-2">
@@ -283,12 +368,10 @@ export function DayLogForm({
           </div>
         )}
 
-        {selectedGraded.length > 0 && (
+        {detailed && selectedGraded.length > 0 && (
           <div className="mt-3">
-            <button type="button" className="link text-[13px]" onClick={() => setShowRate((v) => !v)}>
-              {showRate ? 'Hide severity' : 'Rate how bad (optional)'}
-            </button>
-            {showRate && (
+            <p className="text-[13px] font-medium" style={{ color: 'var(--ink-secondary)' }}>How bad? (optional)</p>
+            {(
               <div className="mt-2 space-y-2.5">
                 {selectedGraded.map((id) => (
                   <div key={id}>
@@ -327,6 +410,7 @@ export function DayLogForm({
         )}
       </Section>
 
+      {detailed && (<>
       {/* Impact */}
       <Section label={date === today ? 'Did symptoms get in the way today?' : 'Did symptoms get in the way that day?'}>
         <div className="flex flex-wrap gap-2">
@@ -341,17 +425,17 @@ export function DayLogForm({
           <div className="mt-3 rounded-xl p-3" style={{ background: 'var(--amber-soft)' }}>
             <p className="mb-2 text-[13px] font-medium">What was affected?</p>
             <div className="flex flex-wrap gap-1.5">
-              {IMPACT_DOMAINS.map((d) => {
-                const key = d.toLowerCase()
+              {IMPACT_DOMAINS.filter((d) => !d.sensitive || record.profile.enabledDomains.includes('sexual')).map((d) => {
+                const key = d.key
                 return (
-                  <button key={d} type="button" className="chip focus-ring" style={{ minHeight: 36, fontSize: 13 }}
+                  <button key={key} type="button" className="chip focus-ring" style={{ minHeight: 36, fontSize: 13 }}
                     data-selected={draft.impactDomains.includes(key)}
                     onClick={() => update({
                       impactDomains: draft.impactDomains.includes(key)
                         ? draft.impactDomains.filter((x) => x !== key)
                         : [...draft.impactDomains, key],
                     })}>
-                    {d}
+                    {d.label}
                   </button>
                 )
               })}
@@ -379,20 +463,30 @@ export function DayLogForm({
           </button>
         </div>
       </Section>
+      </>)}
 
-      {/* Note */}
+      {/* Note: always open, because a collapsed "Add a note" link was easy to miss */}
       <div className="mt-5">
-        {showNote ? (
-          <>
-            <label className="field-label" htmlFor={`note-${date}`}>Note</label>
-            <textarea id={`note-${date}`} className="input" maxLength={2000} value={draft.note}
-              placeholder="Anything worth remembering about today"
-              onChange={(e) => update({ note: e.target.value })} />
-          </>
-        ) : (
-          <button type="button" className="link text-[13.5px]" onClick={() => setShowNote(true)}>
-            + Add a note
+        <label className="field-label" htmlFor={`note-${date}`}>How was today? (optional)</label>
+        <textarea id={`note-${date}`} className="input" maxLength={2000} value={draft.note}
+          placeholder="Type it like a text, e.g. ‘cramps woke me up, skipped class, felt really low tonight’"
+          onChange={(e) => { update({ note: e.target.value }); setUnderstood(null); setReadFailed(false) }} />
+        {mode === 'account' && (
+          <button type="button" className="btn btn-ghost focus-ring mt-2" style={{ minHeight: 40 }}
+            disabled={draft.note.trim().length < 10 || reading}
+            onClick={() => void readNote()}>
+            {reading ? 'Reading your note…' : 'Fill in the form for me'}
           </button>
+        )}
+        {readFailed && (
+          <p className="mt-2 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+            Couldn’t fill it in from your note. AI help may be off (Me → Your data), or you may be offline.
+            Your note is still here; fill in the form above yourself.
+          </p>
+        )}
+        {understood && (
+          <UnderstoodCard result={understood} customLabels={customLabels} areas={areaOptions}
+            onUse={() => fillFromNote(understood)} onDismiss={() => setUnderstood(null)} />
         )}
       </div>
 
@@ -430,6 +524,57 @@ export function DayLogForm({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** "I understood this": what the AI read from her note, before anything changes. */
+function UnderstoodCard({
+  result, customLabels, areas, onUse, onDismiss,
+}: {
+  result: DayInterpretation
+  customLabels: Record<string, string>
+  areas: { key: string; label: string }[]
+  onUse: () => void
+  onDismiss: () => void
+}) {
+  const rows: [string, string][] = []
+  if (result.bleeding) rows.push(['Bleeding', BLEED_LABEL[result.bleeding]])
+  if (result.pain !== null) rows.push(['Pelvic pain', `${result.pain} out of 10`])
+  if (result.symptomIds.length) rows.push(['Symptoms', result.symptomIds.map((id) => symptomLabel(id, customLabels)).join(', ')])
+  if (result.impact !== null) {
+    const level = IMPACT_CHOICES.find((c) => c.level === result.impact)?.label ?? ''
+    const named = result.areas.map((k) => areas.find((a) => a.key === k)?.label ?? k).join(', ')
+    rows.push(['Got in the way', named ? `${level}: ${named}` : level])
+  }
+  if (result.medications.length) rows.push(['Medication', result.medications.join(', ')])
+  return (
+    <div className="notice notice-info mt-3" role="status">
+      <p className="font-semibold">I understood this:</p>
+      <dl className="mt-1.5 space-y-0.5 text-[13.5px]">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex gap-2">
+            <dt className="shrink-0" style={{ color: 'var(--ink-secondary)', minWidth: 110 }}>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {result.unmatched.length > 0 && (
+        <p className="mt-1.5 text-[12.5px]" style={{ color: 'var(--ink-secondary)' }}>
+          Not on your list, so not added: {result.unmatched.join(', ')}. Add it with “+ Add another” if you want to track it.
+        </p>
+      )}
+      <p className="mt-1.5 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+        Read by AI from your note. Words like “bad” become a rough pain score, so check it. Nothing is saved until you save.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn btn-primary focus-ring" style={{ minHeight: 40 }} onClick={onUse}>
+          Fill it in
+        </button>
+        <button type="button" className="btn btn-ghost focus-ring" style={{ minHeight: 40 }} onClick={onDismiss}>
+          No thanks
+        </button>
+      </div>
     </div>
   )
 }

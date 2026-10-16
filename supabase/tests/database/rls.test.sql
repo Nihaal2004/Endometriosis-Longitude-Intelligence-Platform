@@ -10,7 +10,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(46);
+select plan(54);
 
 -- -----------------------------------------------------------------------------
 -- Fixtures: two users. The sign-up trigger should create a profile for each.
@@ -250,11 +250,17 @@ select isnt(
   'the raw token is not stored — only its hash'
 );
 
+select isnt(
+  (select code_hash from public.share_grants limit 1),
+  (select code from share_token),
+  'the raw access code is not stored — only its hash'
+);
+
 select throws_ok(
   $$ select * from public.create_share_link('{}', '{}', 365) $$,
   '22023',
   null,
-  'share links are limited to 7 or 30 days'
+  'share links are limited to 1, 7 or 30 days'
 );
 
 select throws_ok(
@@ -323,16 +329,50 @@ select throws_ok(
 );
 
 select is(
-  (select public.view_shared_report((select token from share_token))->'snapshot'),
-  '{"claims": ["test"]}'::jsonb,
-  'a valid token returns exactly the approved snapshot'
+  public.view_shared_report((select token from share_token), '000000'),
+  null,
+  'the link alone, with a wrong code, returns nothing'
 );
 
 select is(
-  public.view_shared_report('not-a-real-token-but-long-enough'),
+  (select public.view_shared_report((select token from share_token), (select code from share_token))->'snapshot'),
+  '{"claims": ["test"]}'::jsonb,
+  'a valid token and code return exactly the approved snapshot'
+);
+
+select is(
+  public.view_shared_report('not-a-real-token-but-long-enough', '123456'),
   null,
   'an unknown token returns nothing'
 );
+
+-- Five wrong codes lock a link: even the right code then returns nothing.
+select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
+create temp table locked_token as
+select * from public.create_share_link('{"claims": ["locked"]}', '{findings}', 1);
+grant select on locked_token to anon, authenticated;
+select pg_temp.as_anon();
+do $$
+begin
+  for n in 1..5 loop
+    perform public.view_shared_report((select token from locked_token), 'wrong' || n);
+  end loop;
+end
+$$;
+
+select is(
+  public.view_shared_report((select token from locked_token), (select code from locked_token)),
+  null,
+  'five wrong codes lock the link, even against the right code'
+);
+
+select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
+select isnt(
+  (select revoked_at from public.share_grants where id = (select id from locked_token)),
+  null,
+  'a locked link shows as revoked to its owner'
+);
+select pg_temp.as_anon();
 
 -- Revoke, then the same token must stop working.
 select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
@@ -340,9 +380,40 @@ update public.share_grants set revoked_at = now();
 select pg_temp.as_anon();
 
 select is(
-  public.view_shared_report((select token from share_token)),
+  public.view_shared_report((select token from share_token), (select code from share_token)),
   null,
   'a revoked link returns nothing'
+);
+
+-- -----------------------------------------------------------------------------
+-- Health background: optional answers, each from a fixed set
+-- -----------------------------------------------------------------------------
+
+select pg_temp.as_user('11111111-1111-1111-1111-111111111111');
+
+select lives_ok(
+  $$ update public.profiles
+     set heavy_bleeding = 'yes', typical_bleeding_days = 5, health_conditions = '{asthma,migraine}',
+         hormonal_contraception = 'past', reproductive_goals = 'later', last_period_start = '2026-10-01' $$,
+  'a patient can record her health background'
+);
+
+select throws_ok(
+  $$ update public.profiles set heavy_bleeding = 'maybe' $$,
+  '23514', null,
+  'background answers must come from the fixed choices'
+);
+
+select throws_ok(
+  $$ update public.profiles set typical_bleeding_days = 40 $$,
+  '23514', null,
+  'bleeding duration must be plausible'
+);
+
+select throws_ok(
+  $$ update public.profiles set health_conditions = array[repeat('x', 81)] $$,
+  '23514', null,
+  'a health condition is a short label, never a document'
 );
 
 -- -----------------------------------------------------------------------------

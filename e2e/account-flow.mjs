@@ -206,6 +206,8 @@ try {
   await linkBox.waitFor()
   const shareLink = await linkBox.inputValue()
   check('a share link is created and shown once', shareLink.includes('/#/s/'))
+  const accessCode = (await page.getByLabel(/^Access code/).innerText()).trim()
+  check('a 6-digit access code is shown with the link', /^\d{6}$/.test(accessCode), accessCode)
 
   const tokenPart = shareLink.split('/#/s/')[1]
   check(
@@ -218,6 +220,14 @@ try {
   const clinician = await browser.newContext({ viewport: { width: 1100, height: 900 } })
   const cpage = await clinician.newPage()
   await cpage.goto(shareLink)
+  await cpage.getByRole('heading', { name: 'Enter the access code' }).waitFor()
+  check('the link alone shows no report', (await cpage.locator('article').count()) === 0)
+  await cpage.getByLabel('Access code').fill(accessCode === '000000' ? '111111' : '000000')
+  await cpage.getByRole('button', { name: 'Open report' }).click()
+  await cpage.getByText('That didn’t work').waitFor()
+  check('a wrong code opens nothing', (await cpage.locator('article').count()) === 0)
+  await cpage.getByLabel('Access code').fill(accessCode)
+  await cpage.getByRole('button', { name: 'Open report' }).click()
   await cpage.getByRole('heading', { name: 'Longitudinal symptom summary' }).waitFor()
   const sharedText = await cpage.locator('article').innerText()
   check('the clinician sees the report without an account', /patient-reported/i.test(sharedText))
@@ -229,10 +239,19 @@ try {
   )
 
   await page.getByRole('button', { name: 'Done' }).click()
+  await page.getByRole('button', { name: 'Show link & code' }).first().click()
+  check(
+    'after Done, the same link and code can be shown again',
+    (await page.getByLabel('Share link').inputValue()) === shareLink &&
+      (await page.getByLabel(/^Access code/).innerText()).trim() === accessCode,
+  )
+  await page.getByRole('button', { name: 'Done' }).click()
   await page.getByRole('button', { name: 'Revoke' }).first().click()
   await page.waitForTimeout(800)
   await cpage.reload()
-  await cpage.getByRole('heading', { name: 'This report is no longer available' }).waitFor()
+  await cpage.getByLabel('Access code').fill(accessCode)
+  await cpage.getByRole('button', { name: 'Open report' }).click()
+  await cpage.getByText('That didn’t work').waitFor()
   check('a revoked link stops working immediately', true)
   await clinician.close()
 

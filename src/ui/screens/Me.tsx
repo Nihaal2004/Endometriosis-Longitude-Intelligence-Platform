@@ -22,6 +22,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../data'
 import { CONSENT_PURPOSES, GRIEVANCE_CONTACT, NOTICE_VERSION } from '../privacy'
 import { useApp, type ScreenTheme } from '../store'
+import type { ProfileRow } from '../../data/mappers'
 import { PrivacyDialog } from '../PrivacyDialog'
 
 const TREATMENT_KINDS: { id: TreatmentKind; label: string }[] = [
@@ -58,6 +59,7 @@ export default function Me() {
       <h1 style={{ fontSize: 28 }}>Me</h1>
       {mode === 'demo' ? <DemoPanel /> : <AccountPanel />}
       {mode === 'account' && <ProfileCard />}
+      {mode === 'account' && <HealthBackgroundCard />}
       {mode === 'account' && <RemindersAndLock />}
       <HealthHistory />
       {mode === 'account' && <DataRights />}
@@ -207,6 +209,190 @@ function ProfileCard() {
         </button>
         {saved && <span className="text-[13px]" style={{ color: 'var(--sage)' }}>Saved</span>}
       </div>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Health background: the baseline, asked once and changeable any time
+// ---------------------------------------------------------------------------
+
+type BackgroundForm = Record<
+  | 'symptom_onset_year' | 'family_history' | 'previous_pelvic_surgery' | 'health_conditions'
+  | 'age_at_menarche' | 'usual_cycle_min' | 'usual_cycle_max' | 'cycle_regularity' | 'typical_bleeding_days'
+  | 'heavy_bleeding' | 'spotting_between_periods' | 'last_period_start' | 'hormonal_contraception'
+  | 'treatment_amenorrhoea' | 'pregnancy_history' | 'pregnancy_possible' | 'fertility_concerns'
+  | 'reproductive_goals' | 'fertility_treatment',
+  string
+>
+
+const YES_NO_UNSURE = [['yes', 'Yes'], ['no', 'No'], ['unsure', 'Not sure']] as const
+const YES_NO = [['true', 'Yes'], ['false', 'No']] as const
+const CURRENT_PAST = [['current', 'Currently'], ['past', 'In the past'], ['never', 'Never']] as const
+
+function backgroundFormFrom(r: ProfileRow | null | undefined): BackgroundForm {
+  const str = (v: unknown) => (v === null || v === undefined ? '' : String(v))
+  return {
+    symptom_onset_year: str(r?.symptom_onset_year),
+    family_history: str(r?.family_history),
+    previous_pelvic_surgery: str(r?.previous_pelvic_surgery),
+    health_conditions: (r?.health_conditions ?? []).join(', '),
+    age_at_menarche: str(r?.age_at_menarche),
+    usual_cycle_min: str(r?.usual_cycle_min),
+    usual_cycle_max: str(r?.usual_cycle_max),
+    cycle_regularity: str(r?.cycle_regularity),
+    typical_bleeding_days: str(r?.typical_bleeding_days),
+    heavy_bleeding: str(r?.heavy_bleeding),
+    spotting_between_periods: str(r?.spotting_between_periods),
+    last_period_start: str(r?.last_period_start),
+    hormonal_contraception: str(r?.hormonal_contraception),
+    treatment_amenorrhoea: str(r?.treatment_amenorrhoea),
+    pregnancy_history: str(r?.pregnancy_history),
+    pregnancy_possible: str(r?.pregnancy_possible),
+    fertility_concerns: str(r?.fertility_concerns),
+    reproductive_goals: str(r?.reproductive_goals),
+    fertility_treatment: str(r?.fertility_treatment),
+  }
+}
+
+function HealthBackgroundCard() {
+  const { profileRow, repo, today } = useData()
+  const [form, setForm] = useState<BackgroundForm>(() => backgroundFormFrom(profileRow))
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const setField = (k: keyof BackgroundForm, value: string) => {
+    setForm((f) => ({ ...f, [k]: value }))
+    setSaved(false)
+  }
+  const answered = Object.values(backgroundFormFrom(profileRow)).filter(Boolean).length
+
+  async function save() {
+    setError(null)
+    const int = (v: string, lo: number, hi: number, what: string) => {
+      if (!v) return null
+      const n = Number(v)
+      if (!Number.isInteger(n) || n < lo || n > hi) throw new Error(`${what} should be a whole number from ${lo} to ${hi}.`)
+      return n
+    }
+    const pick = <T extends string>(v: string) => (v ? (v as T) : null)
+    const bool = (v: string) => (v === '' ? null : v === 'true')
+    try {
+      const min = int(form.usual_cycle_min, 10, 120, 'Shortest cycle')
+      const max = int(form.usual_cycle_max, 10, 120, 'Longest cycle')
+      if (min !== null && max !== null && max < min) throw new Error('The longest cycle is shorter than the shortest.')
+      if (form.last_period_start && form.last_period_start > today) throw new Error('The last period can’t start in the future.')
+      const conditions = form.health_conditions.split(',').map((c) => c.trim()).filter(Boolean)
+      if (conditions.some((c) => c.length > 80) || conditions.length > 20) throw new Error('Keep each condition short (under 80 letters), up to 20.')
+      await repo?.updateProfile({
+        symptom_onset_year: int(form.symptom_onset_year, 1950, Number(today.slice(0, 4)), 'The year symptoms started'),
+        family_history: bool(form.family_history),
+        previous_pelvic_surgery: bool(form.previous_pelvic_surgery),
+        health_conditions: conditions,
+        age_at_menarche: int(form.age_at_menarche, 6, 25, 'Age at first period'),
+        usual_cycle_min: min ?? max,
+        usual_cycle_max: max ?? min,
+        cycle_regularity: pick<NonNullable<ProfileRow['cycle_regularity']>>(form.cycle_regularity),
+        typical_bleeding_days: int(form.typical_bleeding_days, 1, 15, 'Days of bleeding'),
+        heavy_bleeding: pick<NonNullable<ProfileRow['heavy_bleeding']>>(form.heavy_bleeding),
+        spotting_between_periods: pick<NonNullable<ProfileRow['spotting_between_periods']>>(form.spotting_between_periods),
+        last_period_start: form.last_period_start || null,
+        hormonal_contraception: pick<NonNullable<ProfileRow['hormonal_contraception']>>(form.hormonal_contraception),
+        treatment_amenorrhoea: bool(form.treatment_amenorrhoea),
+        pregnancy_history: pick<NonNullable<ProfileRow['pregnancy_history']>>(form.pregnancy_history),
+        pregnancy_possible: pick<NonNullable<ProfileRow['pregnancy_possible']>>(form.pregnancy_possible),
+        fertility_concerns: pick<NonNullable<ProfileRow['fertility_concerns']>>(form.fertility_concerns),
+        reproductive_goals: pick<NonNullable<ProfileRow['reproductive_goals']>>(form.reproductive_goals),
+        fertility_treatment: pick<NonNullable<ProfileRow['fertility_treatment']>>(form.fertility_treatment),
+      })
+      setSaved(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t save.')
+    }
+  }
+
+  const choice = (k: keyof BackgroundForm, label: string, options: readonly (readonly [string, string])[]) => (
+    <label>
+      <span className="field-label">{label}</span>
+      <select className="input" value={form[k]} onChange={(e) => setField(k, e.target.value)}>
+        <option value="">-</option>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    </label>
+  )
+  const number = (k: keyof BackgroundForm, label: string, placeholder?: string) => (
+    <label>
+      <span className="field-label">{label}</span>
+      <input className="input" inputMode="numeric" value={form[k]} placeholder={placeholder}
+        onChange={(e) => setField(k, e.target.value.replace(/\D/g, '').slice(0, 4))} />
+    </label>
+  )
+  const group = (title: string, note?: string) => (
+    <div className="mt-2 sm:col-span-2">
+      <p className="text-[13px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ink-muted)', fontFamily: 'var(--font-ui)' }}>{title}</p>
+      {note && <p className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>{note}</p>}
+    </div>
+  )
+
+  return (
+    <Card title="Health background"
+      sub="Asked once, so your doctor sees the context behind your logs. Every question is optional; skip anything you’d rather not answer.">
+      {!open ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="btn btn-ghost focus-ring" style={{ minHeight: 42 }}
+            onClick={() => { setForm(backgroundFormFrom(profileRow)); setOpen(true) }}>
+            {answered > 0 ? 'Edit your background' : 'Fill in your background'}
+          </button>
+          <span className="text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            {answered > 0 ? `${answered} answered` : 'Takes about a minute'}
+          </span>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {group('Medical history')}
+            {number('symptom_onset_year', 'Year your symptoms started', 'e.g. 2019')}
+            {choice('family_history', 'Family history of endometriosis', YES_NO)}
+            {choice('previous_pelvic_surgery', 'Previous pelvic surgery', YES_NO)}
+            <label className="sm:col-span-2">
+              <span className="field-label">Other health conditions</span>
+              <input className="input" value={form.health_conditions} maxLength={600}
+                placeholder="e.g. asthma, migraine (separate with commas)"
+                onChange={(e) => setField('health_conditions', e.target.value)} />
+            </label>
+
+            {group('Your periods')}
+            {number('age_at_menarche', 'Age at your first period')}
+            {number('typical_bleeding_days', 'Days your bleeding usually lasts')}
+            {number('usual_cycle_min', 'Shortest usual cycle (days)', 'e.g. 27')}
+            {number('usual_cycle_max', 'Longest usual cycle (days)', 'e.g. 32')}
+            {choice('cycle_regularity', 'How regular are your cycles?', [['regular', 'Regular'], ['variable', 'Somewhat variable'], ['highly_irregular', 'Very irregular']])}
+            {choice('heavy_bleeding', 'Heavy periods?', YES_NO_UNSURE)}
+            {choice('spotting_between_periods', 'Spotting between periods?', YES_NO_UNSURE)}
+            <label>
+              <span className="field-label">When did your last period start?</span>
+              <input className="input" type="date" value={form.last_period_start} max={today}
+                onChange={(e) => setField('last_period_start', e.target.value)} />
+            </label>
+            {choice('hormonal_contraception', 'Hormonal contraception', CURRENT_PAST)}
+            {choice('treatment_amenorrhoea', 'No periods because of a treatment?', YES_NO)}
+
+            {group('Fertility and pregnancy', 'Optional. Never in a share link unless you include it for that link.')}
+            {choice('pregnancy_history', 'Have you been pregnant before?', [['never', 'No'], ['previous', 'Yes'], ['prefer_not', 'Prefer not to say']])}
+            {choice('pregnancy_possible', 'Could you be pregnant now?', YES_NO_UNSURE)}
+            {choice('fertility_concerns', 'Any fertility concerns?', YES_NO_UNSURE)}
+            {choice('reproductive_goals', 'Plans for pregnancy', [['trying', 'Trying to conceive'], ['later', 'Maybe later'], ['not_planning', 'Not planning'], ['unsure', 'Not sure']])}
+            {choice('fertility_treatment', 'Fertility treatment', CURRENT_PAST)}
+          </div>
+          {error && <p className="notice notice-error mt-3">{error}</p>}
+          <div className="mt-4 flex items-center gap-3">
+            <button type="button" className="btn btn-primary focus-ring" style={{ minHeight: 42 }} onClick={() => void save()}>Save</button>
+            <button type="button" className="btn btn-ghost focus-ring" style={{ minHeight: 42 }} onClick={() => setOpen(false)}>Close</button>
+            {saved && <span className="text-[13px]" style={{ color: 'var(--sage)' }}>Saved</span>}
+          </div>
+        </>
+      )}
     </Card>
   )
 }

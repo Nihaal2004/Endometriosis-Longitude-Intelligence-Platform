@@ -13,6 +13,7 @@
     "eval": "tsx src/eval/run-eval.ts",
     "test:db": "supabase test db",
     "e2e": "node e2e/account-flow.mjs && node e2e/phone-layout.mjs",
+    "e2e:ai": "node e2e/ai-flow.mjs",
     "build:android": "tsc -b && vite build --mode android && cap sync android",
     "android:apk": "npm run build:android && cd android && .\\gradlew.bat assembleDebug",
     "android:run": "npm run android:apk && node scripts/android-run.mjs"

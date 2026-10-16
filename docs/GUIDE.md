@@ -10,7 +10,7 @@ The in-app **How it works** section (the *Method* and *Validation* screens) was 
 2. [Using the app, screen by screen](#part-2-using-the-app)
 3. [How the analysis works](#part-3-how-the-analysis-works)
 4. [How well it works (validation)](#part-4-how-well-it-works)
-5. [Medical-term suggestions (the AI feature)](#part-5-medical-term-suggestions)
+5. [AI help (MedGemma)](#part-5-ai-help)
 6. [Data, sync and the backend](#part-6-data-sync-and-the-backend)
 7. [Privacy and consent](#part-7-privacy-and-consent)
 8. [The phone app](#part-8-the-phone-app)
@@ -101,10 +101,12 @@ The cycle ring and today's check-in, and nothing else competing with them.
 |---|---|
 | Bleeding | None, spotting, light, moderate, heavy, very heavy |
 | Pelvic pain | A 0 to 10 slider |
-| Anything else? | Symptom chips chosen by the adaptive planner (see [Part 3](#the-adaptive-check-in)). A small coral dot marks a chip suggested because it often appears around the patient's period. **+ Add another** opens the full symptom list and, for signed-in patients, the **Describe it in your own words** box, which uses the medical-term AI ([Part 5](#part-5-medical-term-suggestions)). Severity (1 to 10) per symptom is optional, behind *Rate how bad*. |
-| Did symptoms get in the way? | No, a little, changed my plans, couldn't do something important. For the last two it asks what was affected: work, education, exercise, sleep, household, social, concentration, mood. |
-| Medication | Ibuprofen, paracetamol, mefenamic acid, anything logged before, or none |
-| Note | Optional free text, up to 2,000 characters |
+| Anything else? | Symptom chips chosen by the adaptive planner (see [Part 3](#the-adaptive-check-in)). A small coral dot marks a chip suggested because it often appears around the patient's period. **+ Add another** opens the full symptom list and, for signed-in patients, the **Describe it in your own words** box, which uses the medical-term AI ([Part 5](#part-5-ai-help)). In Detailed mode, *How bad?* (1 to 10) per symptom. |
+| Did symptoms get in the way? *(Detailed)* | No, a little, changed my plans, couldn't do something important. For the last two it asks what was affected: work, education, exercise, walking / getting around, sleep, household, social, concentration, mood, and sexual activity (only with the sexual-health module on). |
+| Medication *(Detailed)* | Ibuprofen, paracetamol, mefenamic acid, anything logged before, or none |
+| How was today? | Always open, optional free text up to 2,000 characters, written like a text message. Signed-in patients with AI help on can tap **Fill in the form for me** ([Part 5](#filling-a-check-in-from-a-note)). |
+
+**Quick or Detailed.** A switch at the top, remembered on the device. *Quick* (the default) asks bleeding, pain, symptoms and the note, in about 20 seconds; *Detailed* adds severity, impact and medication. A question Quick mode skips is saved as unknown, never as "no", and re-saving a day in Quick mode keeps whatever it already held.
 
 **Clear this day** removes a day's entry. It then counts as *not logged*, not as a day without symptoms, and earlier versions are kept in the history. Days without an entry this week are offered back without guilt messages, because coverage is what lets the report say anything at all. Future days cannot be logged.
 
@@ -123,7 +125,9 @@ The one-page clinician report:
 - **Header**: the name (if given), the period covered, days logged, coverage, complete cycles and typical cycle length.
 - **Recorded period** and **Main concerns** (the clinical names of the most burdensome symptoms).
 - **Longitudinal findings**: patterns linked to the period, persistent symptoms, symptoms that occur together, trends.
-- **Functional impact**: how often symptoms disrupted daily life, and how many days something important could not be done.
+- **Summary in plain words** (optional, AI-written on request): see [Part 5](#a-plain-language-summary).
+- **Background**: the patient's health background (medical, menstrual, and in her own copy, fertility and pregnancy).
+- **Functional impact**: how often symptoms disrupted daily life, how many days something important could not be done, and **which areas of life were most affected** (for example *mood (24 days), social life (24 days) and sleep (3 days)*), each count re-checked against the logged days. Sexual activity is a separate sentence that follows the sexual-health sharing rule.
 - **Change from previous cycles**.
 - **Medication and treatment**: painkiller use, and before/during comparisons for treatments.
 - **Clinical timeline**: appointments, scans and procedures.
@@ -133,8 +137,9 @@ Every sentence can be tapped to open an **evidence panel** showing that its numb
 
 The report can be **shared** (signed-in patients only):
 - Choose sections. *Sexual-health findings* is off unless ticked for that report.
+- Choose what to say about herself: her **name** (off by default; the report then says "Name withheld"), **diagnosis status**, **medical and menstrual history** (on), and **fertility and pregnancy** (off unless ticked).
 - **Preview** the exact document the clinician will see.
-- Create a link that expires after **7 or 30 days**. It can be cancelled at any time, and the patient can see how many times it was opened.
+- Create a link that expires after **1, 7 or 30 days**. It opens only with a **6-digit access code**, shown with the link, which she gives the doctor separately; five wrong codes lock the link. It can be cancelled at any time, the patient can see how many times it was opened, and the link and code can be shown again on the phone that made them.
 - Or save a **PDF**, generated as real text (searchable and small), from the same snapshot as the link.
 
 #### Patterns
@@ -160,6 +165,7 @@ The healthcare journey against the symptom record: a ribbon of daily symptom bur
 |---|---|
 | Account | Email, sync status, sign out (sign-out first tries to sync; unsent entries block it unless forced) |
 | Profile | Name on the report (blank keeps the report anonymous) and diagnosis status (suspected, confirmed, not yet diagnosed) |
+| Health background | Asked once, every question optional. **Medical history**: year symptoms started, family history, previous pelvic surgery, other health conditions. **Periods**: age at first period, usual bleeding days, usual cycle length, regularity, heavy periods, spotting between periods, last period start, hormonal contraception, no periods because of treatment. **Fertility and pregnancy**: pregnancy history, could be pregnant now, fertility concerns, plans for pregnancy, fertility treatment. |
 | Reminders | Daily, around periods only, or none, with a time; *Lock the app* on phones |
 | Treatments & appointments | Add or edit treatments (name, type, dose, start and stop dates, what it was prescribed for, how it's going) and clinical events (GP, gynaecology, emergency, referral, ultrasound, MRI, CT, laparoscopy, surgery, diagnosis) |
 | Your data | Consent switches for each optional purpose, **Download all my data** (every table, as a file), the **privacy notice** (pop-up), and **Delete my account** (type DELETE to confirm; erases everything permanently) |
@@ -205,7 +211,7 @@ Patient review → clinician
 
 Two boundaries are **built into the structure**, not just promised:
 
-- **No statistics inside a language model.** The only AI in the app suggests wording for symptom names ([Part 5](#part-5-medical-term-suggestions)); it never touches analysis. An optional "polish" path for report sentences may only rephrase: any rewrite containing a number not already in the original is rejected.
+- **No statistics inside a language model.** The AI in the app only suggests: symptom names, check-in answers from a note, and plainer wording for finished report sentences ([Part 5](#part-5-ai-help)). It never touches analysis. A summary rewrite may only rephrase: any rewrite with a number not already in the original, a number written as a word, a new quantifier or a new diagnosis is rejected and the original kept.
 - **No calculation inside the user interface.** Nothing in `src/engine/` imports React or anything from `src/ui/`. You can check: `grep -rEl "from 'react|from '\.\./ui" src/engine/` returns nothing.
 
 The whole engine runs on the patient's own device.
@@ -420,11 +426,11 @@ The dip at κ = 4 is sampling noise (each row is a fresh, independently seeded c
 
 | Measure | Result |
 |---|---|
-| Claims verified | **226 of 226 (100%)** |
-| Asserted values independently re-derived | 59.5% |
-| Deliberately injected errors caught | **194 of 194 (100%)** |
+| Claims verified | **256 of 256 (100%)** |
+| Asserted values independently re-derived | 76.6% |
+| Deliberately injected errors caught | **224 of 224 (100%)** |
 
-100% verification alone would prove little: a checker that always says yes scores the same. The **mutation test** is what makes it meaningful: one checkable number per claim is corrupted by a realistic small error, and the checker must reject it. It caught all 194. The remaining 40.5% of values are test statistics (p-values, kappa, slopes, interval bounds) computed from counts already confirmed; re-implementing every test a second time would check arithmetic, not data. Errors are injected only into values the checker actually re-derives, so the catch rate isn't inflated.
+100% verification alone would prove little: a checker that always says yes scores the same. The **mutation test** is what makes it meaningful: one checkable number per claim is corrupted by a realistic small error, and the checker must reject it. It caught all 224. The remaining 23.4% of values are test statistics (p-values, kappa, slopes, interval bounds) computed from counts already confirmed; re-implementing every test a second time would check arithmetic, not data. Errors are injected only into values the checker actually re-derives, so the catch rate isn't inflated.
 
 ### Logging burden
 
@@ -465,7 +471,36 @@ Almost all the time goes to the permutation tests for symptom pairs (2,000 shuff
 
 ---
 
-## Part 5: Medical-term suggestions
+## Part 5: AI help
+
+MedTrace uses one model, **MedGemma 4B** (Google, trained on medical text), run by MedTrace itself, for three jobs. All three need the patient's *AI help* consent and an account, run only when she taps a button, and only ever **suggest**: nothing reaches her record or report without passing a deterministic check and her confirmation.
+
+| Feature | Where | The model sees | What checks it |
+|---|---|---|---|
+| Medical-term suggestions | Check-in → + Add another → Describe it in your own words | The few words she typed | Diagnosis filter; the term is matched to her symptom list in code |
+| Filling a check-in from a note | Check-in → How was today? → Fill in the form for me | Her note and her symptom names | Every value must come from a fixed list; code guards against invented bleeding and pain; she confirms "I understood this" |
+| Plain-language summary | Insights → Report → Write a summary with AI | The report's finished, already-checked sentences, never the diary | Each rewrite must keep every number, write none as a word, add no quantifier or diagnosis; otherwise the original sentence stays |
+
+### Filling a check-in from a note
+
+She writes casually, for example *"Had really bad cramps this morning, around 8 out of 10. Had loose stools and couldn't go to college. Took ibuprofen around ten. Period is heavy today."*, and taps **Fill in the form for me**. The `interpret-day` function asks MedGemma for structured answers, then validates them in code before anything is shown:
+
+- Bleeding, pain, impact and affected areas must come from the form's own choices. Symptom names are matched to her own list by code, and a fixed word table maps everyday words (tired → Fatigue, loose stools → Diarrhoea); a word scan alongside the model catches symptoms it skipped, unless negated ("no bloating").
+- **Nothing is invented.** Bleeding is kept only if the note mentions a period or bleeding; a pain score only if it mentions pain, and it goes on the pelvic-pain slider only if the pain is pelvic (a "back 6/10" does not); 0 pain only if she says so. "None" is never a symptom or a medicine. Anything unmentioned stays unknown.
+- She sees **I understood this:** with each value. **Fill it in** fills the form (switching to Detailed if impact or medication were found, so she sees them); she still saves it herself. Symptoms not on her list are listed, not added.
+
+Tested on five varied notes against the real function: every field correct, with no invented values, after the guards above were added (the raw model had set pain 0 on a note without pain, guessed heavy bleeding from bad cramps, and put a back-pain score on the pelvic slider). About 10 seconds per note on a laptop CPU, 2 to 5 on the ZeroGPU Space.
+
+### A plain-language summary
+
+**Write a summary with AI** sends the report's checked sentences (impact first, then findings, change and medication) to the `summarise-brief` function. The model rewrites each in plain language for a busy doctor. Each rewrite then passes two gates, on the server and again on the device (`verifySummarySentence`):
+
+1. **Numeric gate**: every number must already be in that claim; none may be added or changed.
+2. **Wording gate**: no amount written as a word ("nine", "half"), no new quantifier ("all", "always", "most"), and no diagnosis the original did not contain. These would slip past a digits-only check.
+
+A rewrite that fails keeps the original sentence. The summary shows how many sentences were reworded, every sentence still opens its evidence, and it is kept in memory only, tied to the exact report it rewrote. It can be included in a share link and the PDF. On the test account, MedGemma reworded 8 of 8 sentences, all passing.
+
+### Medical-term suggestions
 
 When a signed-in patient describes a symptom in their own words, an AI suggests the term a doctor would use. It's optional, needs consent, and the patient always decides.
 
@@ -569,7 +604,7 @@ Locally, Supabase runs in Docker on the same PC as Ollama, so it works. Once the
 | A hosted model API (Hugging Face, Groq and others) | Small free tiers | Easy, but text goes to an outside company; the privacy notice must change |
 | A model on the phone itself | Free | Not practical: even 4B is about 3 GB |
 
-Ollama has no password of its own, so on a server it must sit behind a proxy that requires a secret token; set that token as `LLM_API_KEY` (the function already sends it). Then point `LLM_BASE_URL` at the server with `npx supabase secrets set`. No app code changes are needed.
+Ollama has no password of its own, so on a server it must sit behind a proxy that requires a secret token; set that token as `LLM_API_KEY` (the function already sends it). Then point `LLM_BASE_URL` at the server with `npx supabase secrets set`. No app code changes are needed. Without a card, a private Hugging Face Space works instead: see [deploy/hf-space/](../deploy/hf-space/SETUP.md).
 
 ---
 
@@ -616,7 +651,7 @@ Every screen reads from a database **on the device** (IndexedDB via Dexie), neve
 
 | Function | Who can call it | What it does |
 |---|---|---|
-| `create_share_link(snapshot, sections, days)` | Signed-in patient | Generates a 256-bit random token on the server, stores only its hash, sets expiry (7 or 30 days only), records an audit event, and returns the token **once** |
+| `create_share_link(snapshot, sections, days)` | Signed-in patient | Generates a 256-bit random token and a 6-digit access code on the server, stores only their hashes, sets expiry (1, 7 or 30 days only), records an audit event, and returns the token and code **once** |
 | `view_shared_report(token)` | Anyone with the link | Returns the snapshot only if the link is live; expired, revoked and never-existed links look identical. Counts the view and records an audit event. It cannot reach any other data. |
 | `delete_my_account()` | Signed-in patient | Deletes the account; everything cascades. |
 
@@ -637,10 +672,10 @@ MedTrace is designed for a pilot in India under the **Digital Personal Data Prot
 | Keep my symptom record | Required | Save what I log so I can see my patterns and make a report |
 | Sexual-health questions | Off | Log pain during or after sex. Only shared if chosen each time. |
 | Fertility information | Off | Log fertility concerns and treatment |
-| Suggest medical terms | Off | An AI suggests the doctor's term for symptoms described in my own words; I decide whether to keep it |
+| AI help | Off | When I ask, an AI reads what I type (a symptom in my own words, or a note about my day) or my report's findings, and suggests a medical term, check-in answers, or plainer wording; I check everything before it is kept |
 | Help research | Off | My data, with identity removed, may be used for research; I'll be asked again before any study |
 
-- Consents are an **append-only log**: granting and withdrawing are both new records, each stored with the **notice version** the patient saw (currently `2026-10-draft-3`), so it is always possible to say exactly what wording was agreed to. Changing the notice text means bumping the version.
+- Consents are an **append-only log**: granting and withdrawing are both new records, each stored with the **notice version** the patient saw (currently `2026-10-draft-4`), so it is always possible to say exactly what wording was agreed to. Changing the notice text means bumping the version.
 - Withdrawing is as easy as granting (a switch in Me).
 - To withdraw the required consent, the patient deletes the account.
 
@@ -725,14 +760,14 @@ Useful local addresses:
 
 ```bash
 ollama pull medgemma:4b                         # about 3 GB, once
-npx supabase functions serve interpret-symptom  # reaches Ollama at host.docker.internal:11434
+npx supabase functions serve                    # interpret-symptom, interpret-day, summarise-brief; reaches Ollama at host.docker.internal:11434
 ```
 
-Then switch on *Suggest medical terms* in Me.
+Then switch on *AI help* in Me → Your data.
 
 ### After restarting the PC
 
-Start Docker Desktop, then run `npx supabase start`, `npx supabase functions serve interpret-symptom` and `npm run dev`. Ollama starts by itself.
+Start Docker Desktop, then run `npx supabase start`, `npx supabase functions serve` and `npm run dev`. Ollama starts by itself.
 
 ### Loading test logs into an account
 
@@ -753,6 +788,7 @@ The account must be confirmed and onboarded first, because consent must be the p
 | `npm test` | Unit tests |
 | `npm run test:db` | Database tests (pgTAP) |
 | `npm run e2e` | End-to-end browser tests (app must be running) |
+| `npm run e2e:ai` | End-to-end test of the AI features (also needs `supabase functions serve` and Ollama with MedGemma) |
 | `npm run eval` | Regenerate the evaluation metrics (about 60 s) |
 | `npm run build:android` | Web build for Android, then sync |
 | `npm run android:apk` | Build a debug APK |

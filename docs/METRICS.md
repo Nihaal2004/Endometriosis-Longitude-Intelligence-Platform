@@ -139,9 +139,9 @@ Each test case is one symptom for one synthetic patient, labelled as truly perio
 |---|---|---|
 | **κ (generator concentration)** | In the test data, how tightly symptoms cluster around the period. 0 = not at all; higher = tighter. The dial used to test detection power. Different from Cohen's kappa above. | Recall rises from 0.01 at κ = 0 to 0.85 at κ = 6, while specificity stays 0.97 to 1.00 |
 | **Coverage** | Share of days logged. Tested from 100% down to 41%, with random gaps and with "bad days skipped" gaps. | Below 60% the gate reports nothing, by design |
-| **Claims verified** | Share of report sentences whose every number was recomputed independently and matched. | 226 of 226 (100%) |
-| **Values re-derived** | Share of numbers in claims that the checker recomputes from raw days. The rest are test statistics computed from those confirmed counts. | 59.5% |
-| **Mutation catch rate** | One number per claim was deliberately corrupted; the share the checker rejected. This proves the 100% above isn't a checker that always says yes. | 194 of 194 (100%) |
+| **Claims verified** | Share of report sentences whose every number was recomputed independently and matched. | 256 of 256 (100%) |
+| **Values re-derived** | Share of numbers in claims that the checker recomputes from raw days. The rest are test statistics computed from those confirmed counts. | 76.6% |
+| **Mutation catch rate** | One number per claim was deliberately corrupted; the share the checker rejected. This proves the 100% above isn't a checker that always says yes. | 224 of 224 (100%) |
 | **Fields per day** | Questions answered per check-in. | 6.8 adaptive vs 37 for a full fixed questionnaire (81.5% fewer) |
 | **Estimated time** | Fields × 3.5 seconds, an assumption, not measured on real users. | 24 s vs 130 s |
 | **Latency (median / 95th percentile / max)** | Time for the full analysis on a 180-day record. The 95th percentile is the time 95% of runs finish within. | 92 / 110 / 115 ms |

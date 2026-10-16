@@ -210,8 +210,34 @@ export interface PatientProfile {
   usualCycleLength?: [number, number]
   cycleRegularity?: 'regular' | 'variable' | 'highly_irregular'
   ageAtMenarche?: number
+  /** The rest of the baseline: asked once in Me, every answer optional. */
+  background?: HealthBackground
   /** Optional modules the patient has switched on. */
   enabledDomains: SymptomDomain[]
+}
+
+export type YesNoUnsure = 'yes' | 'no' | 'unsure'
+export type CurrentPastNever = 'current' | 'past' | 'never'
+
+/**
+ * Baseline answers beyond cycle length and regularity. Undefined is "not
+ * answered", never "no". The fertility group is sensitive: it is in the
+ * patient's own report but leaves the device in a share link only when she
+ * includes it for that link.
+ */
+export interface HealthBackground {
+  healthConditions?: string[]
+  typicalBleedingDays?: number
+  heavyBleeding?: YesNoUnsure
+  spottingBetweenPeriods?: YesNoUnsure
+  lastPeriodStart?: string
+  hormonalContraception?: CurrentPastNever
+  treatmentAmenorrhoea?: boolean
+  pregnancyHistory?: 'never' | 'previous' | 'prefer_not'
+  pregnancyPossible?: YesNoUnsure
+  fertilityConcerns?: YesNoUnsure
+  reproductiveGoals?: 'trying' | 'later' | 'not_planning' | 'unsure'
+  fertilityTreatment?: CurrentPastNever
 }
 
 export interface PatientRecord {

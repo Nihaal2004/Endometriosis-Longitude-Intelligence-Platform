@@ -18,7 +18,7 @@
  */
 
 import { addDays, daysBetween, DEFAULT_CYCLE_CONFIG, type CycleConfig } from './cycles'
-import { SEVERE_THRESHOLD } from './features'
+import { AREA_KEY_PREFIX, SEVERE_THRESHOLD } from './features'
 import {
   BLEEDING_FLOW_LEVELS,
   ImpactLevel,
@@ -291,6 +291,17 @@ function recompute(
     return SYMPTOM_RULES[key](scope, symptomId)
   }
 
+  // --- Impact areas: days with an impact answer that named the area ---
+  if (key.startsWith(AREA_KEY_PREFIX)) {
+    const area = key.slice(AREA_KEY_PREFIX.length)
+    let n = 0
+    for (const date of scope.dates) {
+      const day = scope.byDate.get(date)
+      if (day?.logged && day.impact !== undefined && (day.impactDomains ?? []).includes(area)) n++
+    }
+    return n
+  }
+
   // --- Record-scoped rules ---
   switch (key) {
     case 'calendarDays':
@@ -487,6 +498,30 @@ export function verifyPolishedText(original: Claim, polished: string): boolean {
   return true
 }
 
+/** Words that state an amount without digits, so the numeric gate would not see them. */
+const AMOUNT_WORDS =
+  /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|half|once|twice|double|triple|dozen|all|every|always|never|most|majority|minority|none|rarely|constantly|daily)\b/gi
+
+/** Diagnoses and disease names: the report never introduces one. */
+const DIAGNOSIS_WORDS =
+  /\b(depression|depressive|endometriosis|adenomyosis|pcos|polycystic|fibroids?|cancer|tumou?r|diabetes|thyroid|anaemia|anemia|infection|ibs|irritable bowel|disorder|syndrome|disease|pmdd|cyst|stage)\b/gi
+
+const wordsIn = (re: RegExp, text: string) => new Set((text.match(re) ?? []).map((w) => w.toLowerCase()))
+
+/**
+ * Gate for an AI-written summary sentence: the numeric gate, plus no amount or
+ * quantifier written as a word ("nine", "all", "always") and no diagnosis that the
+ * original sentence did not already contain. Any failure keeps the original.
+ */
+export function verifySummarySentence(original: Claim, rewrite: string): boolean {
+  if (!rewrite.trim() || !verifyPolishedText(original, rewrite)) return false
+  for (const re of [AMOUNT_WORDS, DIAGNOSIS_WORDS]) {
+    const allowed = wordsIn(re, original.text)
+    for (const w of wordsIn(re, rewrite)) if (!allowed.has(w)) return false
+  }
+  return true
+}
+
 // ---------------------------------------------------------------------------
 // Mutation testing support
 // ---------------------------------------------------------------------------
@@ -503,7 +538,7 @@ export function mutateClaim(
   nextRandom: () => number,
 ): { mutated: Claim; key: string; from: number; to: number } | null {
   const verifiableKeys = Object.keys(claim.assertedValues).filter(
-    (k) => k in SYMPTOM_RULES || RECORD_VERIFIABLE_KEYS.has(k),
+    (k) => k in SYMPTOM_RULES || RECORD_VERIFIABLE_KEYS.has(k) || k.startsWith(AREA_KEY_PREFIX),
   )
   if (verifiableKeys.length === 0) return null
 

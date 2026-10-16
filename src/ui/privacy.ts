@@ -8,7 +8,7 @@
  * (DPDP Act 2023). Until then it is null and the notice says so plainly.
  */
 
-export const NOTICE_VERSION = '2026-10-draft-3'
+export const NOTICE_VERSION = '2026-10-draft-4'
 
 export const GRIEVANCE_CONTACT = null as { name: string; email: string } | null
 
@@ -40,8 +40,8 @@ export const CONSENT_PURPOSES: ConsentPurposeCopy[] = [
   },
   {
     id: 'ai_symptom_wording',
-    title: 'Suggest medical terms',
-    body: 'When I describe a symptom in my own words, an AI suggests the term a doctor would use. I decide whether to keep it.',
+    title: 'AI help',
+    body: 'When I ask, an AI reads what I type (a symptom in my own words, or a note about my day) or my report’s findings, and suggests a medical term, answers for my check-in, or plainer wording. I check everything before it is kept.',
     required: false,
   },
   {
@@ -79,13 +79,13 @@ export const PRIVACY_SECTIONS: { heading: string; body: string[] }[] = [
     heading: 'Where it is stored',
     body: [
       'On your device and on secure servers in India (Mumbai). Only your account can access your records.',
-      'If you turn on medical-term suggestions, only the words you type to describe a symptom are read by an AI model that MedTrace runs itself. They are not sent to any other company.',
+      'If you turn on AI help, and only when you ask, an AI model that MedTrace runs itself reads the words you typed (a symptom description or a note about your day) or your report’s finished findings. It is not sent to any other company, and the AI is never shown your full diary.',
     ],
   },
   {
     heading: 'Sharing',
     body: [
-      'Nothing is shared unless you create a share link. You pick what it includes and see it first. Links expire after 7 or 30 days, and you can cancel them at any time.',
+      'Nothing is shared unless you create a share link. You pick what it includes and see it first. A link opens only with a 6-digit code you give your doctor separately, expires after 1, 7 or 30 days, and you can cancel it at any time.',
     ],
   },
   {

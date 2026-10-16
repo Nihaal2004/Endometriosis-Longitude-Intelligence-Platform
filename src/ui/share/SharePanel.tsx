@@ -1,15 +1,21 @@
 /**
- * SharePanel — choose sections, preview the exact document, create a link.
+ * SharePanel — choose sections and privacy, preview the exact document, create a link.
  *
- * The token is shown once. Only its hash is stored, so it cannot be recovered
- * later — the patient can always revoke and create a new one.
+ * The server stores only hashes of the token and access code. The patient's copy
+ * of both is kept on this device (repo.saveShareKey), so she can reopen a live
+ * link from the list; on another device, or after signing out, she revokes it
+ * and creates a new one.
+ * The link and the code are meant to travel separately: a forwarded link alone
+ * opens nothing, and five wrong codes lock it.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatDateLong, mainConcerns } from '../../engine/brief'
 import { supabase } from '../../data/supabase'
 import { useAnalysis, useData } from '../data'
-import { buildShareSnapshot, SHARE_SECTIONS, type ShareSectionId } from './snapshot'
+import { useCurrentSummary } from '../summaryStore'
+import { hasFertilityAnswers } from './background'
+import { buildShareSnapshot, DEFAULT_PRIVACY, SHARE_SECTIONS, type SharePrivacy, type ShareSectionId } from './snapshot'
 import { SharedReportView } from './SharedReportView'
 
 interface GrantRow {
@@ -36,15 +42,18 @@ export function SharePanel() {
   const [selected, setSelected] = useState<Set<ShareSectionId>>(
     () => new Set(SHARE_SECTIONS.filter((s) => s.defaultOn).map((s) => s.id)),
   )
-  const [days, setDays] = useState<7 | 30>(7)
+  const [privacy, setPrivacy] = useState<SharePrivacy>(DEFAULT_PRIVACY)
+  const [days, setDays] = useState<1 | 7 | 30>(7)
   const [preview, setPreview] = useState(false)
-  const [created, setCreated] = useState<{ url: string; expires: string } | null>(null)
+  const [created, setCreated] = useState<{ url: string; code: string; expires: string } | null>(null)
+  const [keys, setKeys] = useState<Record<string, { url: string; code: string }>>({})
   const [grants, setGrants] = useState<GrantRow[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   const hasSexualContent = record.profile.enabledDomains.includes('sexual')
+  const summary = useCurrentSummary(verifiedClaims)
 
   const snapshot = useMemo(
     () =>
@@ -60,8 +69,10 @@ export function SharePanel() {
         },
         concerns: mainConcerns(ctx, 4, reportLabels),
         selected,
+        privacy,
+        summary: summary ?? undefined,
       }),
-    [verifiedClaims, record, ctx, reportLabels, selected],
+    [verifiedClaims, record, ctx, reportLabels, selected, privacy, summary],
   )
 
   const loadGrants = useCallback(async () => {
@@ -72,7 +83,8 @@ export function SharePanel() {
       .order('created_at', { ascending: false })
       .limit(20)
     setGrants((data as GrantRow[]) ?? [])
-  }, [])
+    if (repo) setKeys(await repo.getShareKeys())
+  }, [repo])
 
   useEffect(() => {
     void loadGrants()
@@ -89,11 +101,13 @@ export function SharePanel() {
     })
     setBusy(false)
     const row = Array.isArray(data) ? data[0] : data
-    if (e || !row?.token) {
+    if (e || !row?.token || !row?.code) {
       setError('Couldn’t create the link. Share links need an internet connection. Check yours and try again.')
       return
     }
-    setCreated({ url: shareUrl(row.token as string), expires: row.expires_at as string })
+    const key = { url: shareUrl(row.token as string), code: row.code as string }
+    await repo?.saveShareKey(row.id as string, key)
+    setCreated({ ...key, expires: row.expires_at as string })
     setPreview(false)
     void loadGrants()
   }
@@ -119,8 +133,8 @@ export function SharePanel() {
     <div className="card p-4">
       <h2 style={{ fontSize: 15 }}>Share with a clinician</h2>
       <p className="mt-1.5 text-[12.5px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        Creates a private link to a fixed copy of this report. They see only what you choose, and
-        nothing else in your account.
+        Creates a private link to a fixed copy of this report, locked with a code only you can give
+        out. They see only what you choose, and nothing else in your account.
       </p>
 
       {created ? (
@@ -137,8 +151,18 @@ export function SharePanel() {
               Done
             </button>
           </div>
+          <p className="mt-3 text-[12.5px] font-semibold" style={{ color: 'var(--ink)' }}>Access code</p>
+          <p className="mt-1 font-mono text-[24px] font-semibold tracking-[0.3em]" style={{ color: 'var(--ink)' }}
+            aria-label={`Access code ${created.code.split('').join(' ')}`}>
+            {created.code}
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
+            The link doesn’t open without this code. Give it to your doctor separately: tell them in person or
+            on the phone, or send it in a different message from the link. Five wrong tries lock the link.
+          </p>
           <p className="mt-2 text-[11.5px]" style={{ color: 'var(--ink-secondary)' }}>
-            Shown once. Expires {formatDateLong(created.expires.slice(0, 10))}. You can revoke it below at any time.
+            Expires {formatDateLong(created.expires.slice(0, 10))}. Saved on this phone only: open it again from
+            Active links below, or revoke it there at any time.
           </p>
         </div>
       ) : !open ? (
@@ -150,7 +174,7 @@ export function SharePanel() {
         <div className="mt-3">
           <p className="text-[12.5px] font-semibold">Include</p>
           <div className="mt-1.5 space-y-1.5">
-            {SHARE_SECTIONS.filter((s) => s.id !== 'sexual_health' || hasSexualContent).map((s) => (
+            {SHARE_SECTIONS.filter((s) => (s.id !== 'sexual_health' || hasSexualContent) && (s.id !== 'summary' || summary)).map((s) => (
               <label key={s.id} className="flex items-start gap-2.5 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
                 <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" style={{ accentColor: 'var(--ink)' }}
                   checked={selected.has(s.id)}
@@ -172,12 +196,35 @@ export function SharePanel() {
             Private notes are never shared.
           </p>
 
+          <p className="mt-3 text-[12.5px] font-semibold">About you</p>
+          <div className="mt-1.5 space-y-1.5">
+            {([
+              { key: 'name', title: 'My name', note: record.profile.displayName ? 'When off, the report says “Name withheld”, so tell your doctor who you are.' : 'You haven’t set a name in Me.' },
+              { key: 'diagnosis', title: 'Diagnosis status and earlier diagnoses' },
+              { key: 'background', title: 'Medical and menstrual history' },
+              ...(hasFertilityAnswers(record.profile)
+                ? [{ key: 'fertility', title: 'Fertility and pregnancy', note: 'Off unless you include it for this report.' }] as const
+                : []),
+            ] as const).map((o) => (
+              <label key={o.key} className="flex items-start gap-2.5 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
+                <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" style={{ accentColor: 'var(--ink)' }}
+                  checked={privacy[o.key]}
+                  disabled={o.key === 'name' && !record.profile.displayName}
+                  onChange={(e) => setPrivacy((cur) => ({ ...cur, [o.key]: e.target.checked }))} />
+                <span>
+                  {o.title}
+                  {'note' in o && <span className="block text-[11.5px]" style={{ color: 'var(--ink-muted)' }}>{o.note}</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+
           <p className="mt-3 text-[12.5px] font-semibold">Link lasts</p>
           <div className="segmented mt-1.5" role="tablist">
-            {([7, 30] as const).map((d) => (
+            {([1, 7, 30] as const).map((d) => (
               <button key={d} type="button" role="tab" aria-selected={days === d} className="focus-ring"
                 onClick={() => setDays(d)}>
-                {d} days
+                {d === 1 ? '1 day' : `${d} days`}
               </button>
             ))}
           </div>
@@ -220,7 +267,15 @@ export function SharePanel() {
                 <span style={{ color: 'var(--ink-secondary)' }}>
                   Created {formatDateLong(g.created_at.slice(0, 10))} · viewed {g.view_count}×
                 </span>
-                <button type="button" className="link text-[12px]" onClick={() => void revoke(g.id)}>Revoke</button>
+                <span className="flex shrink-0 gap-3">
+                  {keys[g.id] && (
+                    <button type="button" className="link text-[12px]"
+                      onClick={() => { setCreated({ ...keys[g.id], expires: g.expires_at }); setOpen(false) }}>
+                      Show link &amp; code
+                    </button>
+                  )}
+                  <button type="button" className="link text-[12px]" onClick={() => void revoke(g.id)}>Revoke</button>
+                </span>
               </li>
             ))}
           </ul>

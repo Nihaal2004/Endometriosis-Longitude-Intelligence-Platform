@@ -14,7 +14,11 @@
 import { useMemo, useState } from 'react'
 import { useAnalysis, useCustomLabels, useData, useRecord } from '../data'
 import { SharePanel } from '../share/SharePanel'
-import { buildShareSnapshot, SHARE_SECTIONS } from '../share/snapshot'
+import { buildShareSnapshot, OWN_COPY_PRIVACY, SHARE_SECTIONS, summarySentences } from '../share/snapshot'
+import { backgroundLines } from '../share/background'
+import { BackgroundList } from '../share/SharedReportView'
+import { summariseClaims } from '../../data/aiAssist'
+import { claimsKey, useCurrentSummary, useSummaryStore } from '../summaryStore'
 import { deliverFile } from '../../native/files'
 import { isNative } from '../../native/platform'
 import { mainConcerns, SAFETY_STATEMENT, formatDateLong, pct } from '../../engine/brief'
@@ -36,6 +40,7 @@ export default function Brief() {
   const customLabels = useCustomLabels()
   const { mode, reportLabels } = useData()
   const [openClaim, setOpenClaim] = useState<Claim | null>(null)
+  const summary = useCurrentSummary(verifiedClaims)
 
   // Browsers print the styled page; inside the Android WebView print() does
   // nothing, so phones get a generated PDF handed to the share sheet. The PDF is
@@ -58,6 +63,9 @@ export default function Brief() {
       },
       concerns: mainConcerns(ctx, 4, reportLabels),
       selected: new Set(SHARE_SECTIONS.map((s) => s.id)),
+      // Her own download: the full report, name included. Privacy choices apply to share links.
+      privacy: OWN_COPY_PRIVACY,
+      summary: summary ?? undefined,
     })
     // Loaded on demand: the PDF library is large and only phones use this path.
     const { buildReportPdf } = await import('../share/reportPdf')
@@ -105,6 +113,10 @@ export default function Brief() {
           </button>
         </div>
 
+        {mode === 'account' && (
+          <AiSummary claims={verifiedClaims} rewrites={summary} onOpen={setOpenClaim} />
+        )}
+
         {/* --- Recorded period --- */}
         <Section title="Recorded period">
           {period.map((c) => (
@@ -138,6 +150,16 @@ export default function Brief() {
             </p>
           )}
         </Section>
+
+        {/* --- Background --- */}
+        {(() => {
+          const lines = backgroundLines(record.profile, { fertility: true })
+          return lines.length > 0 ? (
+            <Section title="Background">
+              <BackgroundList lines={lines} />
+            </Section>
+          ) : null
+        })()}
 
         {/* --- Findings by section --- */}
         {orderedSections.map((s) => {
@@ -202,6 +224,79 @@ export default function Brief() {
         <EvidenceDrawer claim={openClaim} onClose={() => setOpenClaim(null)} labels={customLabels} />
       )}
     </div>
+  )
+}
+
+/**
+ * Plain-language summary, written by AI on request. Each sentence is the AI's
+ * rewrite of one checked claim and has passed verifySummarySentence; one that
+ * failed keeps the original wording. Every sentence still opens its evidence.
+ */
+function AiSummary({
+  claims, rewrites, onOpen,
+}: {
+  claims: Claim[]
+  rewrites: Record<string, string> | null
+  onOpen: (c: Claim) => void
+}) {
+  const setSummary = useSummaryStore((s) => s.set)
+  const clearSummary = useSummaryStore((s) => s.clear)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const candidates = summarySentences(claims, {}).map((s) => s.claim)
+
+  async function write() {
+    setBusy(true)
+    setFailed(false)
+    const result = await summariseClaims(candidates)
+    setBusy(false)
+    if (!result || Object.keys(result).length === 0) return setFailed(true)
+    setSummary(claimsKey(claims), result)
+  }
+
+  if (candidates.length === 0) return null
+
+  if (!rewrites) {
+    return (
+      <div className="no-print mt-5 rounded-xl p-4" style={{ background: 'var(--surface-sunken)' }}>
+        <p className="text-[13.5px] font-semibold">Summary in plain words</p>
+        <p className="mt-1 text-[12.5px]" style={{ color: 'var(--ink-secondary)' }}>
+          An AI can reword the findings below so they’re quicker to read. It only sees these finished
+          sentences, and every number it writes is checked against your logs before it’s shown.
+        </p>
+        <button type="button" className="btn btn-ghost focus-ring mt-3" style={{ minHeight: 40 }}
+          disabled={busy} onClick={() => void write()}>
+          {busy ? 'Writing… (can take a minute)' : 'Write a summary with AI'}
+        </button>
+        {failed && (
+          <p className="mt-2 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+            Couldn’t write a summary. AI help may be off (Me → Your data), or you may be offline.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  const sentences = summarySentences(claims, rewrites)
+  const reworded = sentences.filter((s) => s.rewritten).length
+  return (
+    <Section title="Summary in plain words">
+      <p className="text-[14.5px] leading-relaxed">
+        {sentences.map((s) => (
+          <button key={s.claim.id} type="button" onClick={() => onOpen(s.claim)}
+            className="focus-ring inline rounded text-left"
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--ink)', borderBottom: '1px dotted var(--hairline-strong)' }}
+            title="Show the evidence behind this sentence">
+            {s.text}
+          </button>
+        )).flatMap((el, i) => (i === 0 ? [el] : [' ', el]))}
+      </p>
+      <p className="mt-1.5 text-[11.5px]" style={{ color: 'var(--ink-muted)' }}>
+        Written by AI from the findings below: {reworded} of {sentences.length} sentences reworded. Every number was
+        checked against your logs; a sentence that failed the check keeps its original wording.
+        <button type="button" className="link no-print ml-2 text-[11.5px]" onClick={clearSummary}>Remove</button>
+      </p>
+    </Section>
   )
 }
 
