@@ -167,7 +167,7 @@ export default function Timeline() {
                 Cycle {c.index + 1} {c.complete ? '' : '(ongoing)'}
               </div>
               <div className="display tnum" style={{ fontSize: 22 }}>
-                {c.complete ? `${c.lengthDays}d` : '—'}
+                {c.complete ? `${c.lengthDays}d` : '-'}
               </div>
               <div className="text-[12px]" style={{ color: 'var(--ink-secondary)' }}>
                 from {c.startDate} · {c.bleedDays} bleed days

@@ -188,7 +188,7 @@ export const PERSONAS: Persona[] = [
     age: 31,
     tagline: 'Confirmed endometriosis · on treatment',
     demonstrates:
-      'Persistent, largely non-cyclical pain — the presentation a cycle-only tracker reads as unremarkable. Norethisterone started mid-record, giving a before/during comparison.',
+      'Persistent, largely non-cyclical pain, the presentation a cycle-only tracker reads as unremarkable. Norethisterone started mid-record, giving a before/during comparison.',
     record: generatePatient(priyaConfig),
   },
   {
@@ -197,7 +197,7 @@ export const PERSONAS: Persona[] = [
     age: 19,
     tagline: 'Undiagnosed · tracking started recently',
     demonstrates:
-      'A sparse record at around half coverage, below the evidence floor. The engine withholds every finding rather than reporting patterns it cannot support — and says so, instead of leaving them quietly absent.',
+      'A sparse record at around half coverage, below the evidence floor. The engine withholds every finding rather than reporting patterns it cannot support, and says so, instead of leaving them quietly absent.',
     record: generatePatient(aishaConfig),
   },
 ]

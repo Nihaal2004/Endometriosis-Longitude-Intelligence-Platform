@@ -1,12 +1,25 @@
 import { cloneElement, useId, useState, type ReactElement, type ReactNode } from 'react'
 
+/**
+ * The mark: a cycle ring with the period as a coral arc, the same form as the
+ * ring on the Today screen. Geometry is shared with brand/logo.svg.
+ */
+export function LogoMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden focusable="false">
+      <g transform="rotate(-90 16 16)" fill="none" strokeWidth="3.5" strokeLinecap="round">
+        <circle cx="16" cy="16" r="11" stroke="var(--ink)" strokeDasharray="44.115 25" strokeDashoffset="-20.5" />
+        <circle cx="16" cy="16" r="11" stroke="var(--bleed)" strokeDasharray="16 53.115" />
+      </g>
+      <circle cx="16" cy="16" r="2.4" fill="var(--bleed)" />
+    </svg>
+  )
+}
+
 export function Wordmark({ size = 22 }: { size?: number }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span
-        aria-hidden
-        style={{ width: size * 0.45, height: size * 0.45, borderRadius: 999, background: 'var(--bleed)' }}
-      />
+      <LogoMark size={Math.round(size * 1.15)} />
       <span className="display" style={{ fontSize: size, fontWeight: 600, letterSpacing: '-0.02em' }}>
         MedTrace
       </span>

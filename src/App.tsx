@@ -180,7 +180,7 @@ function Shell() {
       {mode === 'demo' && demoPersonaId && (
         <div className="no-print safe-top px-5 py-2 text-center text-[12.5px]"
           style={{ background: 'var(--ink)', color: 'var(--ground)' }}>
-          Demo patient — {getPersona(demoPersonaId).name}. Synthetic data, nothing saved online.{' '}
+          Demo patient: {getPersona(demoPersonaId).name}. Synthetic data, nothing saved online.{' '}
           <button className="underline underline-offset-2" style={{ background: 'none', border: 'none', color: 'inherit', fontWeight: 600 }}
             onClick={() => { exitDemo(); navigate('/login') }}>
             Leave demo

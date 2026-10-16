@@ -6,7 +6,7 @@
  * on a train with no signal loses nothing and waits for nothing.
  */
 
-import { DEFAULT_TRACKED_SYMPTOMS } from '../engine/symptoms'
+import { DEFAULT_TRACKED_SYMPTOMS, reportLabel } from '../engine/symptoms'
 import type {
   ClinicalEvent,
   DayRecord,
@@ -31,7 +31,12 @@ import {
 import type { Remote } from './remote'
 import { flushOutbox, pullChanges, type FlushResult } from './sync'
 
-export type ConsentPurpose = 'core_tracking' | 'sexual_health_module' | 'fertility_module' | 'research_use'
+export type ConsentPurpose =
+  | 'core_tracking'
+  | 'sexual_health_module'
+  | 'fertility_module'
+  | 'research_use'
+  | 'ai_symptom_wording'
 
 export interface SyncStatus {
   pending: number
@@ -135,6 +140,23 @@ export class Repository {
     const rows = await this.db.customSymptoms.toArray()
     const out: Record<string, string> = {}
     for (const r of rows) if (!r.deleted_at) out[r.symptom_key] = r.label
+    return out
+  }
+
+  /** The same map as the clinician sees it: a confirmed clinical term, with the patient's words beside it. */
+  async getReportLabels(): Promise<Record<string, string>> {
+    const rows = await this.db.customSymptoms.toArray()
+    const out: Record<string, string> = {}
+    for (const r of rows) if (!r.deleted_at) out[r.symptom_key] = reportLabel(r.label, r.clinical_term)
+    return out
+  }
+
+  /** Confirmed clinical terms of patient-defined symptoms, by key. */
+  async getCustomTerms(): Promise<Record<string, string>> {
+    const out: Record<string, string> = {}
+    for (const r of await this.db.customSymptoms.toArray()) {
+      if (!r.deleted_at && r.clinical_term) out[r.symptom_key] = r.clinical_term
+    }
     return out
   }
 
@@ -279,7 +301,12 @@ export class Repository {
   }
 
   /** "+ Add my own symptom". Returns the symptom key, which works anywhere a vocabulary id does. */
-  async addCustomSymptom(label: string, domain: SymptomDomain = 'pain', graded = true): Promise<string> {
+  async addCustomSymptom(
+    label: string,
+    domain: SymptomDomain = 'pain',
+    graded = true,
+    clinicalTerm: string | null = null,
+  ): Promise<string> {
     const clean = label.trim().slice(0, 60)
     if (!clean) throw new Error('A symptom needs a name')
     let key = customSymptomKey(clean)
@@ -293,6 +320,7 @@ export class Repository {
         label: clean,
         domain,
         graded,
+        clinical_term: clinicalTerm,
         client_updated_at: nowIso(),
         deleted_at: null,
       })

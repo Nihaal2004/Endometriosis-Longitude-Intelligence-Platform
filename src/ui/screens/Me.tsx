@@ -22,6 +22,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../data'
 import { CONSENT_PURPOSES, GRIEVANCE_CONTACT, NOTICE_VERSION } from '../privacy'
 import { useApp, type ScreenTheme } from '../store'
+import { PrivacyDialog } from '../PrivacyDialog'
 
 const TREATMENT_KINDS: { id: TreatmentKind; label: string }[] = [
   { id: 'combined_oral_contraceptive', label: 'Combined pill' },
@@ -115,7 +116,7 @@ function AccountPanel() {
 
   const s = syncStatus
   const syncLine = !s
-    ? '—'
+    ? '-'
     : s.syncing
       ? 'Syncing…'
       : s.pending > 0
@@ -127,7 +128,7 @@ function AccountPanel() {
   return (
     <Card title="Account">
       <dl className="space-y-2 text-[14px]">
-        <Row k="Email" v={user?.email ?? '—'} />
+        <Row k="Email" v={user?.email ?? '-'} />
         <Row k="Sync" v={syncLine} />
         {s && s.rejected > 0 && (
           <p className="notice notice-error mt-2">
@@ -478,7 +479,7 @@ function TreatmentForm({
         <label className="sm:col-span-2">
           <span className="field-label">How do you feel it’s going? (optional)</span>
           <select className="input" value={change} onChange={(e) => setChange(e.target.value as typeof change)}>
-            <option value="">—</option>
+            <option value="">-</option>
             <option value="better">Better</option>
             <option value="unchanged">No change</option>
             <option value="worse">Worse</option>
@@ -569,6 +570,7 @@ function DataRights() {
   const [exporting, setExporting] = useState(false)
   const [deleteText, setDeleteText] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [showNotice, setShowNotice] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadConsents = useCallback(async () => {
@@ -667,7 +669,8 @@ function DataRights() {
         <button type="button" className="btn btn-ghost focus-ring" onClick={() => void exportData()} disabled={exporting}>
           {exporting ? 'Preparing…' : 'Download all my data'}
         </button>
-        <Link to="/privacy" className="btn btn-ghost focus-ring">Privacy notice</Link>
+        <button type="button" className="btn btn-ghost focus-ring" onClick={() => setShowNotice(true)}>Privacy notice</button>
+        <PrivacyDialog open={showNotice} onClose={() => setShowNotice(false)} />
       </div>
 
       <div className="mt-6 rounded-xl p-4" style={{ border: '1px solid color-mix(in srgb, var(--viz-critical) 35%, transparent)' }}>
@@ -699,9 +702,11 @@ function DataRights() {
 
       {error && <p className="notice notice-error mt-4">{error}</p>}
 
-      <p className="mt-5 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
-        Questions or complaints: {GRIEVANCE_CONTACT.name}, {GRIEVANCE_CONTACT.email}
-      </p>
+      {GRIEVANCE_CONTACT && (
+        <p className="mt-5 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+          Questions or complaints: {GRIEVANCE_CONTACT.name}, {GRIEVANCE_CONTACT.email}
+        </p>
+      )}
     </Card>
   )
 }

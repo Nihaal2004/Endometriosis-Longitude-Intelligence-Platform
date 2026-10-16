@@ -17,6 +17,7 @@ import { requestReminderPermission } from '../../native/reminders'
 import { CONSENT_PURPOSES, NOTICE_VERSION } from '../privacy'
 import { Wordmark } from './auth/AuthLayout'
 import { Check } from './auth/Register'
+import { PrivacyDialog } from '../PrivacyDialog'
 
 type Step = 'consent' | 'about' | 'symptoms' | 'reminders'
 const STEPS: Step[] = ['consent', 'about', 'symptoms', 'reminders']
@@ -33,7 +34,9 @@ export default function Onboarding() {
     sexual_health_module: false,
     fertility_module: false,
     research_use: false,
+    ai_symptom_wording: false,
   })
+  const [showNotice, setShowNotice] = useState(false)
 
   // About you
   const [displayName, setDisplayName] = useState('')
@@ -109,13 +112,13 @@ export default function Onboarding() {
           <>
             <h1 style={{ fontSize: 28 }}>Before you start</h1>
             <p className="mt-2 text-[14.5px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              Choose what MedTrace may do with your information. You can change any of this later in
-              the Me tab.{' '}
-              <a href="#/privacy" target="_blank" rel="noopener" className="link">
-                Read the full privacy notice
-              </a>
-              .
+              Choose what MedTrace can do. You can change this later in Me.{' '}
+              <button type="button" className="link" style={{ background: 'none', border: 'none', padding: 0 }}
+                onClick={() => setShowNotice(true)}>
+                Privacy notice
+              </button>
             </p>
+            <PrivacyDialog open={showNotice} onClose={() => setShowNotice(false)} />
             <div className="mt-6 space-y-3">
               {CONSENT_PURPOSES.map((p) => (
                 <div key={p.id} className="card p-4">
@@ -155,7 +158,7 @@ export default function Onboarding() {
                 className="input"
                 maxLength={60}
                 autoComplete="given-name"
-                placeholder="Optional — a first name is enough"
+                placeholder="Optional. A first name is enough"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
               />
@@ -217,8 +220,8 @@ export default function Onboarding() {
           <>
             <h1 style={{ fontSize: 28 }}>What do you want to track?</h1>
             <p className="mt-2 text-[14.5px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              These become your quick-tap options each day. You can add anything else — including
-              symptoms in your own words — whenever it happens.
+              These become your quick-tap options each day. You can add anything else, including
+              symptoms in your own words, whenever it happens.
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               {visibleSymptoms.map((s) => (
@@ -242,7 +245,7 @@ export default function Onboarding() {
           <>
             <h1 style={{ fontSize: 28 }}>Gentle reminders</h1>
             <p className="mt-2 text-[14.5px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-              Reminders only ever say “Your check-in is ready” — never the name of a symptom. No
+              Reminders only ever say “Your check-in is ready”, never the name of a symptom. No
               streaks, and no messages about days you missed.
             </p>
             <div className="mt-6 flex flex-col gap-2">

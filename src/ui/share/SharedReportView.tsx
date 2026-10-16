@@ -71,7 +71,7 @@ export function SharedReportView({ report, expiresAt }: { report: SharedReport; 
               <li key={`${t.label}-${t.startDate}`}>
                 <strong>{t.label}</strong>
                 <span style={{ color: 'var(--ink-secondary)' }}>
-                  {' '}— {formatDateLong(t.startDate)} to {t.endDate ? formatDateLong(t.endDate) : 'ongoing'}
+                  {', '}{formatDateLong(t.startDate)} to {t.endDate ? formatDateLong(t.endDate) : 'ongoing'}
                 </span>
               </li>
             ))}
@@ -89,7 +89,7 @@ export function SharedReportView({ report, expiresAt }: { report: SharedReport; 
                 </span>
                 <span>
                   <strong>{e.label}</strong>
-                  {e.reason && <span style={{ color: 'var(--ink-secondary)' }}> — {e.reason}</span>}
+                  {e.reason && <span style={{ color: 'var(--ink-secondary)' }}>: {e.reason}</span>}
                   {e.outcome && <span className="block" style={{ color: 'var(--ink-secondary)' }}>{e.outcome}</span>}
                 </span>
               </li>

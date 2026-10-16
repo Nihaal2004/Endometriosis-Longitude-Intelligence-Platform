@@ -47,7 +47,7 @@ for (const theme of ['light', 'dark']) {
 
   // Insights segments render at phone width too.
   await tabbar.getByRole('link', { name: 'Insights' }).click()
-  for (const seg of ['Patterns', 'Timeline', 'How it works']) {
+  for (const seg of ['Patterns', 'Timeline']) {
     await page.getByRole('tab', { name: seg }).click()
     await page.waitForTimeout(300)
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)

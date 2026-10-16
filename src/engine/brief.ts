@@ -138,20 +138,20 @@ function renderCyclicity(f: Finding, label: string): Claim {
   const mwPct = pct(v.menstrualRate)
   const nonPct = pct(v.nonMenstrualRate)
   const rr = round(v.riskRatio, 1)
-  const ciLow = round(v.riskRatioLow, 1)
-  const ciHigh = round(v.riskRatioHigh, 1)
   const peak = Math.round(v.peakCycleDay)
   const peakPhrase =
     peak === 0
-      ? 'with occurrences centred on the first day of bleeding'
+      ? 'on the first day of bleeding'
       : peak < 0
-        ? `with occurrences centred approximately ${Math.abs(peak)} day${Math.abs(peak) === 1 ? '' : 's'} before the onset of bleeding`
-        : `with occurrences centred approximately ${peak} day${peak === 1 ? '' : 's'} after the onset of bleeding`
+        ? `about ${Math.abs(peak)} day${Math.abs(peak) === 1 ? '' : 's'} before bleeding started`
+        : `about ${peak} day${peak === 1 ? '' : 's'} after bleeding started`
 
+  // Plain words for patient and clinician alike. The statistics behind a sentence
+  // (test, interval, p-value) stay on the finding, never in the prose.
   const text =
-    `${label} was recorded on ${v.menstrualPresent} of ${v.menstrualObserved} observed perimenstrual days (${mwPct}%), ` +
-    `compared with ${v.nonMenstrualPresent} of ${v.nonMenstrualObserved} observed days elsewhere in the cycle (${nonPct}%) — ` +
-    `a rate ratio of ${rr} (95% CI ${ciLow}–${ciHigh}; Fisher's exact ${formatP(f.test!.p)}), ${peakPhrase}.`
+    `${label} was recorded on ${v.menstrualPresent} of ${v.menstrualObserved} logged days around the period (${mwPct}%), ` +
+    `compared with ${v.nonMenstrualPresent} of ${v.nonMenstrualObserved} logged days at other times (${nonPct}%), ` +
+    `about ${rr} times as often. It was most common ${peakPhrase}.`
 
   // assertedValues is a contract: it lists the numbers that literally appear in the
   // sentence, so the fidelity checker verifies what a reader actually sees. When the
@@ -165,8 +165,6 @@ function renderCyclicity(f: Finding, label: string): Claim {
     nonMenstrualObserved: v.nonMenstrualObserved,
     nonMenstrualRatePct: nonPct,
     riskRatio: rr,
-    riskRatioLow: ciLow,
-    riskRatioHigh: ciHigh,
   }
   if (peak !== 0) asserted.peakCycleDayMagnitude = Math.abs(peak)
 
@@ -176,63 +174,50 @@ function renderCyclicity(f: Finding, label: string): Claim {
 function renderPersistence(f: Finding, label: string): Claim {
   const v = f.values
   const text =
-    `${label} was also recorded outside the perimenstrual window on ${v.nonMenstrualPresent} of ` +
-    `${v.nonMenstrualObserved} observed days (${pct(v.nonMenstrualRate)}%, 95% CI ${pct(v.rateLow)}–${pct(v.rateHigh)}%), ` +
-    `indicating it is not confined to menstruation.`
+    `${label} was also recorded on ${v.nonMenstrualPresent} of ${v.nonMenstrualObserved} logged days ` +
+    `away from the period (${pct(v.nonMenstrualRate)}%), so it is not limited to the period.`
 
   return claim(f.id, 'findings', text, {
     nonMenstrualPresent: v.nonMenstrualPresent,
     nonMenstrualObserved: v.nonMenstrualObserved,
     nonMenstrualRatePct: pct(v.nonMenstrualRate),
-    rateLowPct: pct(v.rateLow),
-    rateHighPct: pct(v.rateHigh),
   }, f.evidenceDates)
 }
 
 function renderTrend(f: Finding, label: string): Claim {
   const v = f.values
-  const direction = v.slopePerCycle > 0 ? 'increased' : 'decreased'
-  const slope = round(Math.abs(v.slopePerCycle) * 100, 1)
+  const direction = v.slopePerCycle > 0 ? 'more' : 'less'
   const text =
-    `The proportion of days on which ${label.toLowerCase()} was recorded ${direction} across ` +
-    `${v.cycles} recorded cycles, from ${pct(v.firstCycleRate)}% to ${pct(v.lastCycleRate)}% ` +
-    `(Theil–Sen slope ${v.slopePerCycle > 0 ? '+' : '−'}${slope} percentage points per cycle; ` +
-    `Mann–Kendall ${formatP(f.test!.p)}).`
+    `${label} became ${direction} frequent over ${v.cycles} cycles: it was recorded on ` +
+    `${pct(v.firstCycleRate)}% of days in the first cycle and ${pct(v.lastCycleRate)}% in the most recent.`
 
   return claim(f.id, 'findings', text, {
     cycles: v.cycles,
     firstCycleRatePct: pct(v.firstCycleRate),
     lastCycleRatePct: pct(v.lastCycleRate),
-    slopePoints: slope,
   }, f.evidenceDates)
 }
 
 function renderCoOccurrence(f: Finding, labelA: string, labelB: string): Claim {
   const v = f.values
-  const kappa = round(v.kappa, 2)
-  // Landis & Koch descriptors, used only as a verbal gloss on kappa.
-  const strength = kappa >= 0.61 ? 'substantial' : kappa >= 0.41 ? 'moderate' : 'fair'
   const text =
-    `${labelA} and ${labelB.toLowerCase()} were recorded on the same day ${v.bothPresent} times ` +
-    `across ${v.pairedDays} days on which both were observed — ${strength} agreement beyond chance ` +
-    `(Cohen's κ = ${kappa}, permutation ${formatP(f.test!.p)}).`
+    `${labelA} and ${labelB.toLowerCase()} tended to happen on the same days: both were recorded on ` +
+    `${v.bothPresent} of the ${v.pairedDays} days when both were logged, more often than chance alone would explain.`
 
   return claim(f.id, 'findings', text, {
     bothPresent: v.bothPresent,
     pairedDays: v.pairedDays,
-    kappa,
   }, f.evidenceDates)
 }
 
 function renderBaselineChange(f: Finding, label: string): Claim {
   const v = f.values
-  const scope = v.restrictedToNonMenstrual ? 'Non-menstrual ' : ''
+  const scope = v.restrictedToNonMenstrual ? ' on days away from the period' : ''
   const direction = v.latestRate > v.priorRate ? 'higher' : 'lower'
   const text =
-    `${scope}${label.toLowerCase()} was recorded on ${v.latestPresent} of ${v.latestObserved} observed days ` +
-    `in the most recent complete cycle (${pct(v.latestRate)}%), ${direction} than the ${pct(v.priorRate)}% ` +
-    `recorded across the preceding ${v.priorCycles} cycles (${v.priorPresent} of ${v.priorObserved} days; ` +
-    `exact Poisson rate comparison ${formatP(f.test!.p)}).`
+    `${label}${scope} was recorded on ${v.latestPresent} of ${v.latestObserved} logged days ` +
+    `in the most recent full cycle (${pct(v.latestRate)}%), ${direction} than the ${pct(v.priorRate)}% ` +
+    `across the previous ${v.priorCycles} cycles (${v.priorPresent} of ${v.priorObserved} days).`
 
   return claim(f.id, 'change', text, {
     latestPresent: v.latestPresent,
@@ -249,10 +234,10 @@ function renderTreatmentResponse(f: Finding, label: string, treatmentLabel: stri
   const v = f.values
   const direction = v.duringRate < v.beforeRate ? 'lower' : 'higher'
   const text =
-    `Since ${treatmentLabel.toLowerCase()} began on ${formatDateLong(startDate)}, ${label.toLowerCase()} was recorded on ` +
-    `${v.duringPresent} of ${v.duringObserved} observed days (${pct(v.duringRate)}%), ${direction} than the ` +
-    `${pct(v.beforeRate)}% recorded beforehand (${v.beforePresent} of ${v.beforeObserved} days; ${formatP(f.test!.p)}). ` +
-    `This describes recorded rates before and during treatment and is not a controlled comparison.`
+    `Since ${treatmentLabel} began on ${formatDateLong(startDate)}, ${label.toLowerCase()} was recorded on ` +
+    `${v.duringPresent} of ${v.duringObserved} logged days (${pct(v.duringRate)}%), ${direction} than the ` +
+    `${pct(v.beforeRate)}% beforehand (${v.beforePresent} of ${v.beforeObserved} days). ` +
+    `This compares days before and during treatment and is not a controlled comparison, so it does not show that the treatment caused the change.`
 
   return claim(f.id, 'medication', text, {
     duringPresent: v.duringPresent,
@@ -267,16 +252,14 @@ function renderTreatmentResponse(f: Finding, label: string, treatmentLabel: stri
 function renderFunctionalBurden(f: Finding): Claim {
   const v = f.values
   const text =
-    `Symptoms interfered with normal activity on ${v.limitingDays} of ${v.observedDays} days on which ` +
-    `impact was recorded (${pct(v.limitingRate)}%, 95% CI ${pct(v.rateLow)}–${pct(v.rateHigh)}%), including ` +
-    `${v.couldNotPerformDays} day${v.couldNotPerformDays === 1 ? '' : 's'} on which an important activity could not be completed.`
+    `Symptoms got in the way of normal activities on ${v.limitingDays} of ${v.observedDays} days when this was ` +
+    `recorded (${pct(v.limitingRate)}%), including ` +
+    `${v.couldNotPerformDays} day${v.couldNotPerformDays === 1 ? '' : 's'} when something important could not be done.`
 
   return claim(f.id, 'impact', text, {
     limitingDays: v.limitingDays,
     observedDays: v.observedDays,
     limitingRatePct: pct(v.limitingRate),
-    rateLowPct: pct(v.rateLow),
-    rateHighPct: pct(v.rateHigh),
     couldNotPerformDays: v.couldNotPerformDays,
   }, f.evidenceDates)
 }
@@ -303,7 +286,7 @@ export function generateBrief(
       'period',
       'period',
       `Recorded ${formatDateLong(ctx.window.start)} to ${formatDateLong(ctx.window.end)}. ` +
-        `${ctx.loggedDays} of ${ctx.calendarDays} days contain an entry (${pct(ctx.coverage)}% coverage).`,
+        `${ctx.loggedDays} of ${ctx.calendarDays} days have an entry (${pct(ctx.coverage)}% of days logged).`,
       {
         loggedDays: ctx.loggedDays,
         calendarDays: ctx.calendarDays,
@@ -320,7 +303,7 @@ export function generateBrief(
         'period',
         'period',
         `1 complete cycle observed, ${cycleSummary.medianLength} days long. ` +
-          `Cycle timing is derived from recorded bleeding, not from a predicted cycle.`,
+          `Cycles are worked out from logged bleeding, not predicted.`,
         { completeCycles: 1, medianLength: cycleSummary.medianLength ?? 0 },
         [],
         ':cycles',
@@ -331,9 +314,9 @@ export function generateBrief(
       claim(
         'period',
         'period',
-        `${cycleSummary.completeCount} complete cycles observed, ` +
-          `median length ${cycleSummary.medianLength} days (range ${cycleSummary.minLength}–${cycleSummary.maxLength}). ` +
-          `Cycle timing is derived from recorded bleeding, not from a predicted cycle.`,
+        `${cycleSummary.completeCount} complete cycles observed, usually ${cycleSummary.medianLength} days long ` +
+          `(shortest ${cycleSummary.minLength}, longest ${cycleSummary.maxLength}). ` +
+          `Cycles are worked out from logged bleeding, not predicted.`,
         {
           completeCycles: cycleSummary.completeCount,
           medianLength: cycleSummary.medianLength ?? 0,
@@ -389,8 +372,8 @@ export function generateBrief(
       claim(
         'medication_summary',
         'medication',
-        `Analgesia was recorded on ${meds.daysWithMedication} days. On ${meds.severeDespiteMedication} of those days ` +
-          `a symptom of severity 7 or above was still recorded.`,
+        `Painkillers were recorded on ${meds.daysWithMedication} days. On ${meds.severeDespiteMedication} of those days ` +
+          `a symptom was still rated 7 or more out of 10.`,
         {
           daysWithMedication: meds.daysWithMedication,
           severeDespiteMedication: meds.severeDespiteMedication,
@@ -406,10 +389,13 @@ export function generateBrief(
     claim(
       'data_quality',
       'quality',
-      `All information above is patient-reported. Days without an entry are treated as unknown and are excluded ` +
-        `from every denominator; they are not counted as symptom-free. ` +
-        `${gatedCount} additional pattern${gatedCount === 1 ? ' was' : 's were'} computed but withheld for insufficient data.`,
-      { gatedCount },
+      `All information above was recorded by the patient. Days without an entry are treated as unknown; ` +
+        `they are not counted as symptom-free. A pattern is only included when it repeats across at least ` +
+        `two cycles and is unlikely to be chance.` +
+        (gatedCount > 0
+          ? ` ${gatedCount} other possible pattern${gatedCount === 1 ? ' was' : 's were'} left out because there is not yet enough data.`
+          : ''),
+      gatedCount > 0 ? { gatedCount } : {},
       [],
     ),
   )

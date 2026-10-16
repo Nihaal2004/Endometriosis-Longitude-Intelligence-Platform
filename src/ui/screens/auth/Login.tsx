@@ -97,7 +97,7 @@ function DemoPicker({ onPick }: { onPick: (personaId: string) => void }) {
         Just looking?
       </h2>
       <p className="mt-1 text-[13px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        Explore with a synthetic demo patient — no account, nothing stored online.
+        Explore with a synthetic demo patient. No account, nothing stored online.
       </p>
       <div className="mt-3 space-y-2">
         {PERSONAS.map((p) => (

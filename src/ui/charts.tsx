@@ -16,7 +16,7 @@
  *     labels and a table view.
  */
 
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 
 // ---------------------------------------------------------------------------
 // Shared bits
@@ -296,7 +296,7 @@ export function CycleRing({
                         <>
                           <strong>{d.date}</strong>
                           <br />
-                          {d.logged ? label.split(', ').slice(1).join(' · ') : 'No entry — tap to add'}
+                          {d.logged ? label.split(', ').slice(1).join(' · ') : 'No entry, tap to add'}
                         </>
                       ),
                     })
@@ -379,16 +379,31 @@ export function PhaseHeatmap({
 }) {
   const [hover, setHover] = useState<TooltipState | null>(null)
   const hatchId = useId()
-  const cell = 26
+  // Fit the container: on a phone the grid shrinks its label column and cells
+  // rather than scrolling sideways and hiding day 0 off-screen.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [boxW, setBoxW] = useState(600)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const measure = () => setBoxW(el.clientWidth || 600)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const narrow = boxW < 420
+  const labelW = narrow ? 96 : 132
+  const cell = Math.max(16, Math.min(26, Math.floor((boxW - labelW) / dayRange.length)))
   const gapPx = 2
-  const labelW = 132
   const headerH = 26
+  const maxLabel = narrow ? 12 : 18
 
   const width = labelW + dayRange.length * cell
   const height = headerH + rows.length * cell
 
   return (
-    <div style={{ position: 'relative', overflowX: 'auto' }}>
+    <div ref={boxRef} style={{ position: 'relative', overflowX: 'auto' }}>
       <svg width={width} height={height} role="img" aria-label="Symptom occurrence rate by cycle day">
         <defs>
           <pattern id={hatchId} width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
@@ -404,7 +419,7 @@ export function PhaseHeatmap({
             x={labelW + i * cell + cell / 2}
             y={headerH - 9}
             textAnchor="middle"
-            fontSize={10.5}
+            fontSize={cell < 22 ? 9.5 : 10.5}
             className="tnum"
             fill={d === 0 ? 'var(--viz-ink)' : 'var(--viz-ink-muted)'}
             fontWeight={d === 0 ? 600 : 400}
@@ -429,13 +444,13 @@ export function PhaseHeatmap({
         {rows.map((row, ri) => (
           <g key={row.label}>
             <text
-              x={labelW - 12}
+              x={labelW - (narrow ? 8 : 12)}
               y={headerH + ri * cell + cell / 2 + 4}
               textAnchor="end"
-              fontSize={12}
+              fontSize={narrow ? 11 : 12}
               fill="var(--viz-ink-secondary)"
             >
-              {row.label.length > 18 ? `${row.label.slice(0, 17)}…` : row.label}
+              {row.label.length > maxLabel ? `${row.label.slice(0, maxLabel - 1)}…` : row.label}
             </text>
 
             {dayRange.map((d, ci) => {
@@ -466,7 +481,7 @@ export function PhaseHeatmap({
                         <>
                           <strong>{row.label}</strong> · day {d === 0 ? 'D0' : d > 0 ? `+${d}` : d}
                           <br />
-                          No observations — unknown
+                          No observations, unknown
                         </>
                       ),
                     })
@@ -485,15 +500,17 @@ export function PhaseHeatmap({
 
 export function SequentialLegend({ max }: { max: number }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>0%</span>
-      <div className="flex" style={{ gap: 2 }}>
-        {SEQ_STEPS.map((c) => (
-          <span key={c} style={{ width: 20, height: 10, borderRadius: 2, background: c }} />
-        ))}
-      </div>
-      <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>{Math.round(max * 100)}%</span>
-      <span className="ml-2 inline-flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--ink-muted)' }}>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="inline-flex items-center gap-3">
+        <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>0%</span>
+        <span className="flex" style={{ gap: 2 }}>
+          {SEQ_STEPS.map((c) => (
+            <span key={c} style={{ width: 16, height: 10, borderRadius: 2, background: c }} />
+          ))}
+        </span>
+        <span className="text-[12px]" style={{ color: 'var(--ink-muted)' }}>{Math.round(max * 100)}%</span>
+      </span>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px]" style={{ color: 'var(--ink-muted)' }}>
         <span
           style={{
             width: 10, height: 10, borderRadius: 2,

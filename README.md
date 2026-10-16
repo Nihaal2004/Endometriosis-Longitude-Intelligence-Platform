@@ -27,19 +27,29 @@ cp .env.example .env.local   # paste the key into VITE_SUPABASE_ANON_KEY
 npm run dev          # register; confirmation emails arrive in Mailpit, http://127.0.0.1:54324
 ```
 
+**Medical-term suggestions** (optional): when a patient describes a symptom in their own words, the `interpret-symptom` edge function asks [MedGemma](https://huggingface.co/google/medgemma-4b-it) — Google's open model trained on medical text — for the clinical term a gynaecologist would use. It runs free on [Ollama](https://ollama.com), so the words go to no outside company. The patient confirms the suggestion, and the report shows the term with their own words beside it. It runs only for patients who opt in (consent purpose `ai_symptom_wording`); if the model is unreachable or consent is off, the words are saved as typed.
+
+```bash
+ollama pull medgemma:4b                         # ~3 GB, once
+npx supabase functions serve interpret-symptom  # reaches Ollama at host.docker.internal:11434
+```
+
+Any OpenAI-compatible endpoint works: set `LLM_BASE_URL`, `LLM_MODEL` and, if needed, `LLM_API_KEY` as function secrets. A hosted provider receives patients' words, so update the privacy notice first.
+
 **Checks:**
 
 ```bash
-npm test             # 170 unit tests: statistics, engine, data layer, check-in rules, sharing
+npm test             # 179 unit tests: statistics, engine, data layer, check-in rules, sharing, medical-term validation
 npm run test:db      # 46 pgTAP tests: row-level security, history, sharing, erasure
-npm run e2e          # end-to-end account flow (27 checks) + phone layout (18 checks)
+npm run e2e          # end-to-end account flow (28 checks) + phone layout (16 checks)
 npm run eval         # regenerate the engine evaluation metrics (~60s)
 ```
 
 **Android** (Capacitor 8 — needs JDK 21 and the Android SDK):
 
 ```bash
-npm run android:apk  # web build in "android" mode, cap sync, then gradle assembleDebug
+npm run android:run  # build the current code, install it on the running emulator, and open it
+npm run android:apk  # just build the APK (android/app/build/outputs/apk/debug/)
 ```
 
 The emulator reaches a laptop's local Supabase at `10.0.2.2`; put that in `.env.android.local`. iOS needs a Mac with Xcode, or a cloud build service.
@@ -54,7 +64,7 @@ Four tabs, so the daily screen stays a 20-second check-in and the analysis lives
 |---|---|
 | **Today** | The cycle ring (tap any day to open its log; page back through earlier cycles) and today's check-in |
 | **Calendar** | The month at a glance — bleeding, logged, not logged. Tap any past day to change it |
-| **Insights** | The clinician **Report** (share it as an expiring link, or save a PDF), **Patterns**, **Timeline**, and **How it works** (method and validation) |
+| **Insights** | The clinician **Report** (share it as an expiring link, or save a PDF), **Patterns** in plain language, and **Timeline** |
 | **Me** | Profile, reminders, app lock, treatments and appointments, data download, consent, account deletion |
 
 Accounts are email and password (Supabase Auth, PKCE). Every entry is stored on the device first and synced in the background, so logging never waits for a connection.
@@ -79,6 +89,8 @@ Three properties do the work:
 
 | Document | Contents |
 |---|---|
+| [`docs/GUIDE.md`](docs/GUIDE.md) | **Everything in one place**: every screen, how the analysis works and why, validation results, the medical-term AI, backend, privacy, phone app, setup and testing |
+| [`docs/METRICS.md`](docs/METRICS.md) | **Every metric explained in plain words**: the numbers in the report, the statistics behind them (p, q, Fisher, kappa and so on), and the evaluation metrics (precision, recall, F1, MCC) |
 | [`BUILDLOG.md`](BUILDLOG.md) | Methods and their rationale, full evaluation results with interpretation, and the defects found and fixed |
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements, data model, acceptance criteria |
 | [`docs/COMPETITIVE_ANALYSIS.md`](docs/COMPETITIVE_ANALYSIS.md) | Methodology compared against Flo, Clue, Phendo, Bearable and Guava, with the divergences measured |

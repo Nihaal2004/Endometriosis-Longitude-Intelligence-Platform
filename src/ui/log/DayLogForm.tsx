@@ -11,9 +11,10 @@
 
 import { useMemo, useState } from 'react'
 import { planDailyQuestions } from '../../engine/adaptive'
-import { getSymptom, symptomLabel, SYMPTOMS } from '../../engine/symptoms'
+import { clinicalLabel, getSymptom, symptomLabel, SYMPTOMS } from '../../engine/symptoms'
 import type { FeatureContext } from '../../engine/features'
 import { BLEEDING_LEVELS, ImpactLevel, type BleedingLevel, type DayRecord } from '../../engine/types'
+import { interpretSymptom, type CatalogEntry, type Interpretation } from '../../data/interpret'
 import { isFutureDate } from '../../lib/dates'
 import { useData } from '../data'
 import { buildDayRecord, draftFromDay, PRIMARY_PAIN, type DayLogDraft } from './dayLog'
@@ -48,7 +49,7 @@ export function DayLogForm({
   onSaved?: () => void
   onCleared?: () => void
 }) {
-  const { record, customLabels, today, saveDay, clearDay, repo, mode } = useData()
+  const { record, customLabels, customTerms, today, saveDay, clearDay, repo, mode } = useData()
   const existing = useMemo(() => record.days.find((d) => d.date === date), [record.days, date])
 
   // Suggested chips: the adaptive plan for this date, plus anything already
@@ -72,6 +73,8 @@ export function DayLogForm({
   const [showRate, setShowRate] = useState(false)
   const [showNote, setShowNote] = useState(Boolean(existing?.note))
   const [customLabel, setCustomLabel] = useState('')
+  const [interpreting, setInterpreting] = useState(false)
+  const [suggestion, setSuggestion] = useState<{ label: string; result: Interpretation } | null>(null)
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [confirmClear, setConfirmClear] = useState(false)
 
@@ -111,11 +114,43 @@ export function DayLogForm({
     onCleared?.()
   }
 
+  // What the patient's words may be matched against: everything they could pick
+  // here, minus the pain slider's own symptom and any domain they have not enabled.
+  const catalog = useMemo<CatalogEntry[]>(() => [
+    ...SYMPTOMS
+      .filter((s) => s.id !== PRIMARY_PAIN && (!s.sensitive || record.profile.enabledDomains.includes('sexual')))
+      .map((s) => ({ id: s.id, label: s.label, clinicalTerm: s.clinicalTerm })),
+    ...Object.entries(customLabels).map(([id, label]) => ({ id, label, clinicalTerm: customTerms[id] })),
+  ], [record.profile.enabledDomains, customLabels, customTerms])
+
+  const select = (id: string) => {
+    if (!draft.selected.has(id)) toggle(id)
+  }
+
+  /** Offer a clinical term when the patient has consented; otherwise (or on any failure) keep their words as typed. */
   async function addOwnSymptom() {
-    if (!repo || !customLabel.trim()) return
-    const key = await repo.addCustomSymptom(customLabel)
+    const label = customLabel.trim()
+    if (!repo || !label || interpreting) return
+    setInterpreting(true)
+    const result = await interpretSymptom(label, catalog)
+    setInterpreting(false)
+    if (result) setSuggestion({ label, result })
+    else await saveOwnSymptom(label)
+  }
+
+  async function saveOwnSymptom(label: string, result?: Interpretation) {
+    if (!repo) return
+    const term = result?.match === 'new' ? result.clinicalTerm : null
+    const key = await repo.addCustomSymptom(label, result?.domain, result?.graded, term)
     setCustomLabel('')
-    toggle(key)
+    setSuggestion(null)
+    select(key)
+  }
+
+  function pickCatalogMatch(id: string) {
+    setCustomLabel('')
+    setSuggestion(null)
+    select(id)
   }
 
   if (future) {
@@ -223,13 +258,27 @@ export function DayLogForm({
             {mode === 'account' && (
               <div className="mt-3 flex gap-2">
                 <input className="input" style={{ minHeight: 40 }} placeholder="Describe it in your own words"
-                  value={customLabel} maxLength={60} onChange={(e) => setCustomLabel(e.target.value)}
+                  value={customLabel} maxLength={60} disabled={interpreting || suggestion !== null}
+                  onChange={(e) => setCustomLabel(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addOwnSymptom() } }} />
                 <button type="button" className="btn btn-ghost focus-ring" style={{ minHeight: 40, paddingInline: 14 }}
-                  onClick={() => void addOwnSymptom()} disabled={!customLabel.trim()}>
-                  Add
+                  onClick={() => void addOwnSymptom()} disabled={!customLabel.trim() || interpreting || suggestion !== null}>
+                  {interpreting ? 'Checking…' : 'Add'}
                 </button>
               </div>
+            )}
+            {suggestion && (
+              <SuggestionCard
+                label={suggestion.label}
+                result={suggestion.result}
+                customLabels={customLabels}
+                onAccept={() => {
+                  const r = suggestion.result
+                  if (r.match === 'catalog') pickCatalogMatch(r.catalogId)
+                  else void saveOwnSymptom(suggestion.label, r)
+                }}
+                onDecline={() => void saveOwnSymptom(suggestion.label)}
+              />
             )}
           </div>
         )}
@@ -354,7 +403,7 @@ export function DayLogForm({
         </button>
         {status === 'saved' && (
           <span className="text-[13.5px]" style={{ color: 'var(--sage)' }} role="status">
-            Saved{mode === 'account' ? '' : ' (demo — stays in this browser)'}
+            Saved{mode === 'account' ? '' : ' (demo, stays in this browser)'}
           </span>
         )}
         {existing && !confirmClear && (
@@ -368,7 +417,7 @@ export function DayLogForm({
       {confirmClear && (
         <div className="notice notice-info mt-4">
           <p>
-            Clear everything logged for this day? It will count as <strong>not logged</strong> — not as a
+            Clear everything logged for this day? It will count as <strong>not logged</strong>, not as a
             day without symptoms. Earlier versions are kept in your history.
           </p>
           <div className="mt-3 flex gap-2">
@@ -381,6 +430,44 @@ export function DayLogForm({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** The patient decides: a suggestion is never saved without a tap. */
+function SuggestionCard({
+  label, result, customLabels, onAccept, onDecline,
+}: {
+  label: string
+  result: Interpretation
+  customLabels: Record<string, string>
+  onAccept: () => void
+  onDecline: () => void
+}) {
+  const existing = result.match === 'catalog'
+  return (
+    <div className="notice notice-info mt-3" role="status">
+      {existing ? (
+        <p>
+          “{label}” sounds like <strong>{symptomLabel(result.catalogId, customLabels)}</strong>, which is already
+          on your list{getSymptom(result.catalogId)?.clinicalTerm ? ` (your doctor sees “${clinicalLabel(result.catalogId)}”)` : ''}.
+        </p>
+      ) : (
+        <p>
+          Your doctor’s report will say <strong>{result.clinicalTerm}</strong>, with your words “{label}” beside it.
+        </p>
+      )}
+      <p className="mt-1 text-[12.5px]" style={{ color: 'var(--ink-muted)' }}>
+        Suggested by AI from your words. Check it fits before you keep it.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn btn-primary focus-ring" style={{ minHeight: 40 }} onClick={onAccept}>
+          {existing ? 'Use that' : 'Keep this'}
+        </button>
+        <button type="button" className="btn btn-ghost focus-ring" style={{ minHeight: 40 }} onClick={onDecline}>
+          Just my own words
+        </button>
+      </div>
     </div>
   )
 }

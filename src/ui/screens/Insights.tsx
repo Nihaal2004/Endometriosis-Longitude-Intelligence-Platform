@@ -1,27 +1,22 @@
 /**
  * Insights — every piece of analysis, kept out of the daily flow.
  *
- * Segments: Report (the clinician brief), Patterns, Timeline, How it works
- * (Method + Validation). Until there is enough data for the evidence gate, a
+ * Segments: Report (the clinician brief), Patterns, Timeline. Until there is enough data for the evidence gate, a
  * progress card explains exactly what is still needed rather than leaving the
  * patient to wonder why the page is empty.
  */
 
-import { useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { DEFAULT_GATE } from '../../engine/patterns'
 import { useAnalysis, useData } from '../data'
 import Brief from './Brief'
-import Method from './Method'
 import Patterns from './Patterns'
 import Timeline from './Timeline'
-import Validation from './Validation'
 
 const SECTIONS = [
   { id: 'report', label: 'Report' },
   { id: 'patterns', label: 'Patterns' },
   { id: 'timeline', label: 'Timeline' },
-  { id: 'how', label: 'How it works' },
 ] as const
 
 type SectionId = (typeof SECTIONS)[number]['id']
@@ -46,12 +41,11 @@ export default function Insights() {
         </div>
       </div>
 
-      {current !== 'how' && <EvidenceProgress />}
+      <EvidenceProgress />
 
       {current === 'report' && <Brief />}
       {current === 'patterns' && <Patterns />}
       {current === 'timeline' && <Timeline />}
-      {current === 'how' && <HowItWorks />}
     </div>
   )
 }
@@ -74,7 +68,7 @@ function EvidenceProgress() {
     <section className="card p-5">
       <h2 style={{ fontSize: 17 }}>Your patterns are still forming</h2>
       <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed" style={{ color: 'var(--ink-secondary)' }}>
-        MedTrace only reports a pattern once there is enough data to back it up — usually two
+        MedTrace only reports a pattern once there is enough data to back it up, usually two
         complete cycles with most days logged. Until then it says nothing rather than guess.
       </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -104,29 +98,6 @@ function Progress({ label, value, sub, fraction }: { label: string; value: strin
         <div style={{ width: `${Math.max(3, Math.min(1, fraction) * 100)}%`, height: '100%', background: 'var(--ink)', borderRadius: 999 }} />
       </div>
       {sub && <p className="mt-1 text-[11.5px]" style={{ color: 'var(--ink-muted)' }}>{sub}</p>}
-    </div>
-  )
-}
-
-function HowItWorks() {
-  const [showValidation, setShowValidation] = useState(false)
-  return (
-    <div className="space-y-5">
-      <Method />
-      <section className="card p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 style={{ fontSize: 18 }}>Engine validation</h2>
-            <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-secondary)' }}>
-              How accurately the pattern engine performs on synthetic data where the right answer is known.
-            </p>
-          </div>
-          <button type="button" className="btn btn-ghost focus-ring" onClick={() => setShowValidation((v) => !v)}>
-            {showValidation ? 'Hide' : 'Show results'}
-          </button>
-        </div>
-      </section>
-      {showValidation && <Validation />}
     </div>
   )
 }

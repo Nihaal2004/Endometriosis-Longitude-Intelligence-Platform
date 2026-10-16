@@ -30,7 +30,7 @@ export function shareUrl(token: string): string {
 }
 
 export function SharePanel() {
-  const { record, customLabels, repo } = useData()
+  const { record, reportLabels, repo } = useData()
   const { ctx, verifiedClaims } = useAnalysis()
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<Set<ShareSectionId>>(
@@ -58,10 +58,10 @@ export function SharePanel() {
           calendarDays: ctx.calendarDays,
           completeCycles: ctx.windowCycles.filter((c) => c.complete).length,
         },
-        concerns: mainConcerns(ctx, 4, customLabels),
+        concerns: mainConcerns(ctx, 4, reportLabels),
         selected,
       }),
-    [verifiedClaims, record, ctx, customLabels, selected],
+    [verifiedClaims, record, ctx, reportLabels, selected],
   )
 
   const loadGrants = useCallback(async () => {
@@ -90,7 +90,7 @@ export function SharePanel() {
     setBusy(false)
     const row = Array.isArray(data) ? data[0] : data
     if (e || !row?.token) {
-      setError('Couldn’t create the link. Share links need an internet connection — check yours and try again.')
+      setError('Couldn’t create the link. Share links need an internet connection. Check yours and try again.')
       return
     }
     setCreated({ url: shareUrl(row.token as string), expires: row.expires_at as string })
@@ -202,7 +202,7 @@ export function SharePanel() {
           <div className="mx-auto max-w-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between rounded-xl px-4 py-2.5"
               style={{ background: 'var(--surface)' }}>
-              <span className="text-[13px] font-semibold">Preview — exactly what the clinician will see</span>
+              <span className="text-[13px] font-semibold">Preview: exactly what the clinician will see</span>
               <button type="button" className="link text-[13px]" onClick={() => setPreview(false)}>Close</button>
             </div>
             <SharedReportView report={snapshot} />

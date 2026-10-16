@@ -81,6 +81,8 @@ export interface CustomSymptomRow extends SyncedRow {
   label: string
   domain: SymptomDomain
   graded: boolean
+  /** Patient-confirmed clinical term for the report; see data/interpret.ts. */
+  clinical_term?: string | null
 }
 
 export interface ProfileRow {

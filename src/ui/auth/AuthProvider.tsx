@@ -43,7 +43,7 @@ export function friendlyAuthError(error: AuthError | Error | null | undefined): 
     return 'That email and password don’t match. Check both and try again.'
   }
   if (code === 'email_not_confirmed' || msg.includes('email not confirmed')) {
-    return 'Please confirm your email first — we sent you a link when you registered.'
+    return 'Please confirm your email first. We sent you a link when you registered.'
   }
   if (code === 'user_already_exists' || msg.includes('already registered')) {
     return 'An account with this email already exists. Try signing in, or reset your password.'

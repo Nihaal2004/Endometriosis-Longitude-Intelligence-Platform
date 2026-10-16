@@ -82,6 +82,14 @@ export function clinicalLabel(id: string, custom?: Record<string, string>): stri
   return def.clinicalTerm ?? def.label
 }
 
+/**
+ * Clinician label for a patient-defined symptom. A confirmed clinical term never
+ * appears alone: the patient's own words stay beside it.
+ */
+export function reportLabel(label: string, clinicalTerm?: string | null): string {
+  return clinicalTerm ? `${clinicalTerm} (“${label}”)` : label
+}
+
 export function symptomsByDomain(domain: string): SymptomDefinition[] {
   return SYMPTOMS.filter((s) => s.domain === domain)
 }

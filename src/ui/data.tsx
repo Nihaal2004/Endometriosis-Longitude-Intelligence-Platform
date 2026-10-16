@@ -42,6 +42,10 @@ interface DataContextValue {
   /** False on a fresh device until the account's profile has been downloaded. */
   profileKnown: boolean
   customLabels: Record<string, string>
+  /** Patient-defined symptoms as the clinician reads them (confirmed clinical term + own words). */
+  reportLabels: Record<string, string>
+  /** Confirmed clinical terms of patient-defined symptoms (empty in demo mode). */
+  customTerms: Record<string, string>
   /** "Today" on the patient's calendar (demo: the last day of the persona's data). */
   today: string
   window: AnalysisWindow
@@ -91,6 +95,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [profileRow, setProfileRow] = useState<ProfileRow | null>(null)
   const [profileKnown, setProfileKnown] = useState(false)
   const [accountLabels, setAccountLabels] = useState<Record<string, string>>({})
+  const [accountReportLabels, setAccountReportLabels] = useState<Record<string, string>>({})
+  const [accountTerms, setAccountTerms] = useState<Record<string, string>>({})
   const [accountRevision, setAccountRevision] = useState(0)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [today, setToday] = useState(localToday())
@@ -129,15 +135,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     const reload = async () => {
-      const [record, labels, profile, known] = await Promise.all([
+      const [record, labels, reportLabels, terms, profile, known] = await Promise.all([
         r.loadRecord(),
         r.getCustomLabels(),
+        r.getReportLabels(),
+        r.getCustomTerms(),
         r.getProfileRow(),
         r.hasLocalProfile(),
       ])
       if (cancelled) return
       setAccountRecord(record)
       setAccountLabels(labels)
+      setAccountReportLabels(reportLabels)
+      setAccountTerms(terms)
       setProfileRow(profile)
       setProfileKnown(known)
       setSyncStatus({ ...r.getSyncStatus() })
@@ -202,6 +212,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         profileRow: profileRow ?? (user ? defaultProfileRow(user.id) : null),
         profileKnown,
         customLabels: accountLabels,
+        reportLabels: accountReportLabels,
+        customTerms: accountTerms,
         today,
         window: accountWindow(record, today, windowDays),
         revision: accountRevision,
@@ -223,6 +235,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         profileRow: null,
         profileKnown: true,
         customLabels: CUSTOM_LABELS[demoPersonaId] ?? {},
+        reportLabels: CUSTOM_LABELS[demoPersonaId] ?? {},
+        customTerms: {},
         // The demo's data ends on a fixed date; treat that as "today" so the
         // ring and check-in show a populated cycle rather than a month of gap.
         today: record.days[record.days.length - 1]?.date ?? today,
@@ -243,6 +257,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       profileRow: null,
       profileKnown: true,
       customLabels: {},
+      reportLabels: {},
+      customTerms: {},
       today,
       window: { start: today, end: today },
       revision: 0,
@@ -253,7 +269,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       signOutSafely,
     }
   }, [
-    user, accountRecord, profileRow, profileKnown, accountLabels, accountRevision, repo, syncStatus,
+    user, accountRecord, profileRow, profileKnown, accountLabels, accountReportLabels, accountTerms, accountRevision, repo, syncStatus,
     demoPersonaId, demoEdits, demoRevision, saveDemoDay, clearDemoDay,
     today, windowDays, signOutSafely,
   ])
@@ -277,9 +293,10 @@ export function useCustomLabels(): Record<string, string> {
 
 /** The engine's output for the current record and window. Recomputed only when either changes. */
 export function useAnalysis(): Analysis {
-  const { mode, record, window, customLabels, revision, repo } = useData()
+  const { mode, record, window, reportLabels, revision, repo } = useData()
   const owner = mode === 'account' ? repo?.userId : record.profile.id
-  return analyse(record, window, customLabels, `${mode}:${owner}:${window.start}:${window.end}:${revision}`)
+  // The analysis produces the clinician brief, so it reads the report's labels.
+  return analyse(record, window, reportLabels, `${mode}:${owner}:${window.start}:${window.end}:${revision}`)
 }
 
 /** Days between the window's start and end, inclusive — used for "N days tracked". */

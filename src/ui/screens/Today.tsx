@@ -59,7 +59,7 @@ export default function Today() {
         {info && (
           <div className="mt-4 space-y-2 rounded-xl p-3 text-[12.5px] leading-relaxed"
             style={{ background: 'var(--surface-sunken)', color: 'var(--ink-secondary)' }}>
-            <p>Coloured segments are bleeding days. Dashes are days with no entry — they stay <em>unknown</em> and are never counted as symptom-free.</p>
+            <p>Coloured segments are bleeding days. Dashes are days with no entry. They stay <em>unknown</em> and are never counted as symptom-free.</p>
             <p>The pale track is the rest of a typical cycle. It isn’t a prediction of your next period.</p>
             <p className="tnum">
               {record.days.length} {record.days.length === 1 ? 'day' : 'days'} logged so far.
@@ -80,7 +80,7 @@ export default function Today() {
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
           <h1 style={{ fontSize: 26 }}>Today</h1>
           {loggedToday && (
-            <span className="text-[12.5px]" style={{ color: 'var(--sage)' }}>Logged — change anything below</span>
+            <span className="text-[12.5px]" style={{ color: 'var(--sage)' }}>Logged. Change anything below</span>
           )}
         </div>
 

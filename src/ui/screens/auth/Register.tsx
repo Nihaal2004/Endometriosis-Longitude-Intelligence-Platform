@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthProvider'
+import { PrivacyDialog } from '../../PrivacyDialog'
 import { AuthLayout, Field, PasswordInput, isPlausibleEmail, passwordProblem } from './AuthLayout'
 
 export default function Register() {
@@ -12,6 +13,8 @@ export default function Register() {
   const [confirm, setConfirm] = useState('')
   const [adult, setAdult] = useState(false)
   const [readNotice, setReadNotice] = useState(false)
+  const [noticeOpened, setNoticeOpened] = useState(false)
+  const [showNotice, setShowNotice] = useState(false)
   const [touched, setTouched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -80,14 +83,30 @@ export default function Register() {
           <Check checked={adult} onChange={setAdult}>
             I am 18 or older.
           </Check>
-          <Check checked={readNotice} onChange={setReadNotice}>
-            I have read the{' '}
-            <Link to="/privacy" className="link" target="_blank" rel="noopener">
-              privacy notice
-            </Link>{' '}
-            and understand how my health information is used.
+          <Check checked={readNotice} onChange={setReadNotice} disabled={!noticeOpened}>
+            I have read and agree to the privacy notice.
           </Check>
+          <p className="pl-8 text-[13px]" style={{ color: 'var(--ink-muted)' }}>
+            <button type="button" className="link" style={{ background: 'none', border: 'none', padding: 0 }}
+              onClick={() => setShowNotice(true)}>
+              Read the privacy notice
+            </button>
+            {!noticeOpened && ' to tick this box.'}
+          </p>
         </div>
+
+        <PrivacyDialog
+          open={showNotice}
+          onClose={() => {
+            setShowNotice(false)
+            setNoticeOpened(true)
+          }}
+          onAgree={() => {
+            setShowNotice(false)
+            setNoticeOpened(true)
+            setReadNotice(true)
+          }}
+        />
 
         {error && (
           <p className="notice notice-error mt-5" role="alert">
@@ -95,7 +114,7 @@ export default function Register() {
           </p>
         )}
 
-        <button type="submit" className="btn btn-primary focus-ring mt-6 w-full" disabled={busy || !configured}>
+        <button type="submit" className="btn btn-primary focus-ring mt-6 w-full" disabled={busy || !configured || !adult || !readNotice}>
           {busy ? 'Creating account…' : 'Create account'}
         </button>
       </form>
@@ -113,17 +132,21 @@ export default function Register() {
 export function Check({
   checked,
   onChange,
+  disabled,
   children,
 }: {
   checked: boolean
   onChange: (v: boolean) => void
+  disabled?: boolean
   children: React.ReactNode
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-snug" style={{ color: 'var(--ink-secondary)' }}>
+    <label className={`flex items-start gap-3 text-[14px] leading-snug ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+      style={{ color: 'var(--ink-secondary)', opacity: disabled ? 0.55 : 1 }}>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="mt-0.5 h-5 w-5 shrink-0"
         style={{ accentColor: 'var(--ink)' }}
